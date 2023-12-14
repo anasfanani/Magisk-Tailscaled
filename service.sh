@@ -5,11 +5,11 @@ done
 # wait for network to be available
 echo "Waiting network to be available">/data/local/tmp/tailscaled.log
 while true; do
-    ping -c 1 8.8.8.8 > /dev/null 2>&1
+    curl -Is 1.1.1.1 > /dev/null 2>&1
     if [ $? -eq 0 ]; then
         break
     else
-        sleep 1
+        sleep 2
     fi
 done
 # ensure boot & network has actually completed
