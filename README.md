@@ -148,6 +148,11 @@ For more information, check out the links below:
 - [Tailscale Static Packages](https://pkgs.tailscale.com/stable/#static)
 - [Tailscale Knowledge Base](https://tailscale.com/kb)
 
+## Credits
+
+- [Tailscale Inc & AUTHORS](https://github.com/tailscale/tailscale). for the static binaries of tailscale & tailscaled
+- [John Wu](https://github.com/topjohnwu/Magisk). for The Magic Mask for Android
+
 ## Disclaimer
 
 This module is not affiliated with the official Tailscale. It is a third-party implementation and the author is not responsible for any damage to your device that may occur from its use. Use at your own risk.
