@@ -81,7 +81,7 @@ jobs:
             --arg newVersion "$new_tag" \
             --arg newVersionCode "$newVersionCode" \
             --arg newZipUrl "$zipUrl" \
-            --arg newChangelog "https://github.com/anasfanani/Magisk-Tailscaled/releases/latest" \
+            --arg newChangelog "https://raw.githubusercontent.com/anasfanani/Magisk-Tailscaled/master/CHANGELOG.txt" \
             update.json > temp.json && mv temp.json update.json
           sed -i "s/^version=.*/version=$versionString/" module.prop
           sed -i "s/^versionCode=.*/versionCode=$newVersionCode/" module.prop
