@@ -74,7 +74,7 @@ jobs:
         run: |
           versionString="${{ steps.check_version.outputs.version }}.0"
           new_tag="${{ steps.check_version.outputs.new_tag }}.0"
-          zipUrl="https://github.com/lexavey/Magisk-Tailscaled/releases/download/$new_tag/Magisk-Tailscaled-$new_tag.zip"
+          zipUrl="https://github.com/anasfanani/Magisk-Tailscaled/releases/download/$new_tag/Magisk-Tailscaled-$new_tag.zip"
           IFS='.' read -ra VERSION_PARTS <<< "$versionString"
           newVersionCode=$(printf "%02d%02d%02d%02d" "${VERSION_PARTS[0]}" "${VERSION_PARTS[1]}" "${VERSION_PARTS[2]}" "${VERSION_PARTS[3]}")
           jq '.version = $newVersion | .versionCode = $newVersionCode | .zipUrl = $newZipUrl | .changelog = $newChangelog' \
