@@ -66,7 +66,8 @@ passwd
 
 Enter your password when prompted, for example, `123`.
 
-2. Get your IP with the command `tailscale ip` or check your IP in the [Tailscale Admin Dashboard](https://login.tailscale.com/admin/machines).
+2. Run ssh daemon with command `sshd`
+3. Get your IP with the command `tailscale ip` or check your IP in the [Tailscale Admin Dashboard](https://login.tailscale.com/admin/machines).
 
 ### On your Windows PC:
 
