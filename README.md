@@ -47,9 +47,6 @@ This command uses a userspace network stack instead of the kernel's network stac
 5. Run 'tailscale status' to check the Tailscale connection.
 6. Alternatively, you can open the [Tailscale Admin Dashboard](https://login.tailscale.com/admin/machines) to manage your devices.
 
-
-GitHub Copilot: You can add the following section to your README.md file:
-
 ## Example of Using Tailscale
 
 You can use Tailscale to connect SSH from Termux on Android to a Windows PC. Here's how:
@@ -151,7 +148,7 @@ For more information, check out the links below:
 ## Credits
 
 - [Tailscale Inc & AUTHORS](https://github.com/tailscale/tailscale). for the static binaries of tailscale & tailscaled
-- [John Wu](https://github.com/topjohnwu/Magisk). for The Magic Mask for Android
+- [John Wu & Authors](https://github.com/topjohnwu/Magisk). for The Magic Mask for Android
 
 ## Disclaimer
 
