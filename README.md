@@ -29,6 +29,11 @@ The [Tailscale app](https://play.google.com/store/apps/details?id=com.tailscale.
 
 After installation, the Tailscale daemon (`tailscaled`) will run automatically on boot.
 
+## Atention
+
+Due to many people have problem with run command `tailscale` you must go to `/data/local/tmp/` directory first, then type `tailscale ip` or `tailscale status`
+Example : `cd /data/local/tmp/ && tailscale ip`
+
 ## Usage
 
 This module runs `tailscaled` with the following command:
