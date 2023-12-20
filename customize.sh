@@ -8,11 +8,10 @@ ui_print "- Detected architecture: $F_ARCH"
 ui_print "- Extracting module files"
 
 F_TARGETDIR="$MODPATH/system/bin"
-UNZIP="/data/adb/magisk/busybox unzip"
 
 mkdir -p "$F_TARGETDIR"
-$UNZIP -qq -o "$ZIPFILE" "files/tailscaled-$F_ARCH" -j -d "$F_TARGETDIR"
-$UNZIP -qq -o "$ZIPFILE" "files/tailscale-$F_ARCH" -j -d "$F_TARGETDIR"
+unzip -qq -o "$ZIPFILE" "files/tailscaled-$F_ARCH" -j -d "$F_TARGETDIR"
+unzip -qq -o "$ZIPFILE" "files/tailscale-$F_ARCH" -j -d "$F_TARGETDIR"
 
 mv "$F_TARGETDIR/tailscaled-$F_ARCH" "$F_TARGETDIR/tailscaled"
 mv "$F_TARGETDIR/tailscale-$F_ARCH" "$F_TARGETDIR/tailscale"
@@ -21,13 +20,11 @@ ui_print "- Extracted files to $F_TARGETDIR"
 
 ui_print "- Setting permissions"
 
-set_perm_recursive $MODPATH 0 0 0755 0644
 set_perm_recursive $F_TARGETDIR 0 2000 0755 0755
-set_perm $MODPATH/service.sh 0 0 0755
 
 ui_print "- Cleaning up"
 
-rm -r "$F_TARGETDIR/files" # cleanup
+rm -r "$MODPATH/files" # cleanup
 
 ui_print "*******************"
 ui_print " Instructions       "
