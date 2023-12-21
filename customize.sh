@@ -20,7 +20,9 @@ ui_print "- Extracted files to $F_TARGETDIR"
 
 ui_print "- Setting permissions"
 
-set_perm_recursive $F_TARGETDIR 0 2000 0755 0755
+#set_perm_recursive $F_TARGETDIR 0 2000 0644 0755
+set_perm $MODPATH/system/bin/tailscale 0 0 0755
+set_perm $MODPATH/system/bin/tailscaled 0 0 0755
 
 ui_print "- Cleaning up"
 
