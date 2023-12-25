@@ -31,17 +31,16 @@ After installation, the Tailscale daemon (`tailscaled`) will run automatically o
 
 ## Atention
 
-Due to many people have problem with run command `tailscale` you must go to `/data/local/tmp/` directory first, then type `tailscale ip` or `tailscale status`
-Example : `cd /data/local/tmp/ && tailscale ip`
+As discussed in [this issue](https://github.com/anasfanani/Magisk-Tailscaled/issues/1#issuecomment-1860837922), I have implemented a wrapper script for the `tailscale` and `tailscaled` commands. This script simplifies the usage of these commands by providing default arguments and handling the `--socket` argument in a specific way. With this script, you can now use `tailscale login` directly without navigating to the `tmp` directory. The wrapper script is located at `/system/bin/tailscale` & `/system/bin/tailscaled`.
 
 ## Usage
 
 This module runs `tailscaled` with the following command:
 
 ```bash
-tailscaled -tun=userspace-networking -statedir=/data/local/tmp/ -state=/data/local/tmp/tailscaled.state -socket=/data/local/tmp/tailscaled.sock -port=41641
+tailscaled -tun=userspace-networking -statedir=/data/adb/tailscale/tmp/ -state=/data/adb/tailscale/tmp/tailscaled.state -socket=/data/adb/tailscale/tmp/tailscaled.sock -port=41641
 ```
-This command uses a userspace network stack instead of the kernel's network stack, which can be useful on devices where the kernel's network stack is not compatible with Tailscale. The state file for tailscaled is stored at `/data/local/tmp/tailscaled.state`, and the log output is written to `/data/local/tmp/tailscaled.log`.
+This command uses a userspace network stack instead of the kernel's network stack, which can be useful on devices where the kernel's network stack is not compatible with Tailscale. The state file for tailscaled is stored at `/data/adb/tailscale/tmp/tailscaled.state`, and the log output is written to `/data/adb/tailscale/tmp/tailscaled.log`.
 
 ## Instructions
 
@@ -49,14 +48,16 @@ This command uses a userspace network stack instead of the kernel's network stac
 2. Run 'su' to gain root access.
 3. Run 'tailscale login' to login to your Tailscale account.
 4. Open the URL in a browser to authorize your device.
-5. Run 'tailscale status' to check the Tailscale connection.
+5. Run 'tailscale ip' to retrieve your Tailscale IP.
 6. Alternatively, you can open the [Tailscale Admin Dashboard](https://login.tailscale.com/admin/machines) to manage your devices.
 
 ## Example of Using Tailscale
 
+### SSH to Termux
+
 You can use Tailscale to connect SSH from Termux on Android to a Windows PC. Here's how:
 
-### On your Android device:
+#### On your Android device:
 
 1. Set up SSHD:
 
@@ -71,19 +72,48 @@ Enter your password when prompted, for example, `123`.
 2. Run ssh daemon with command `sshd`
 3. Get your IP with the command `tailscale ip` or check your IP in the [Tailscale Admin Dashboard](https://login.tailscale.com/admin/machines).
 
-### On your Windows PC:
+#### On your Windows PC:
 
-1. Open the terminal.
-2. SSH to your Android IP:
+1. Download & install [Tailscale for Windows](https://tailscale.com/download/windows)
+1. Open app & login to the Tailscale.
+3. Open the terminal & SSH to your Android IP:
 
 ```bash
-ssh [randomuser]@[android ip tailscale] -p 8022
+ssh <random_user>@<tailscale_ip> -p 8022
 ```
 
 For example:
 
 ```bash
 ssh user@100.95.95.95 -p 8022
+```
+
+### SSH access to your Android device
+
+You can also enable SSH access to your Android device using [Tailscale SSH](https://tailscale.com/kb/1193/tailscale-ssh?slug=kb&slug=1193&slug=tailscale-ssh). To do this, advertise SSH on the host with the command `tailscale up --ssh`.
+
+By default, Tailscale's SSH feature may not work on Android because it requires `getent`, which is part of GNU libc, and relies on glibc-specific features like nsswitch.conf.
+
+To overcome this, I've created a mock `getent` and placed it in `tailscale/bin/`. This mock `getent` is used by Tailscale's [userLookupGetent](https://github.com/tailscale/tailscale/blob/5812093d31c8a7f9c5e3a455f0fd20dcc011d8cd/util/osuser/user.go#L121C19-L121C33) function.
+
+After advertising SSH on the host, you can SSH into your Android device using `ssh root@<tailscale_ip>`.
+
+### ADB over Tailscale
+
+You can run ADB over Tailscale. First, you need to enable ADB over TCP/IP. You can do this with the following commands:
+
+```bash
+setprop service.adb.tcp.port 5555
+stop adbd
+start adbd
+```
+
+These commands set the ADB daemon to listen on TCP port 5555 and then restart the ADB daemon to apply the change.
+
+After enabling ADB over TCP/IP, you can connect to your Android device from your Windows machine using the `adb connect` command followed by your Tailscale IP and the port number:
+
+```bash
+adb connect <tailscale_ip>:5555
 ```
 
 ## Avalilable command
@@ -133,13 +163,15 @@ For more details about CLI commands, check out the [Tailscale CLI documentation]
 
 Tailscale has some known issues. You can check them out [here](https://github.com/tailscale/tailscale/issues?q=no+safe+place+found+to+store+log+state).
 
-In order to execute any Tailscale command on the terminal, you must navigate to the directory `/data/local/tmp/` and then execute the Tailscale command. For example, `cd /data/local/tmp/` then `tailscale login`, or `tailscale status`.
+In order to execute any Tailscale command on the terminal, you must navigate to the directory `/data/adb/tailscale/tmp/` and then execute the Tailscale command. For example, `cd /data/adb/tailscale/tmp/` then `tailscale login`, or `tailscale status`.
+
+To address this issue, I have created mock versions of `tailscale` and `tailscaled`. Now, you can run `tailscale login` directly without needing to navigate to the `/data/adb/tailscale/tmp/` directory.
 
 If you encounter any problems, take a look at the `service.sh` file. You can modify the commands that are not necessary. If you make some modifications to the commands and they work, please open an issue and make a report.
 
-Currently, this module does not support KernelSU as the author has not used it. Therefore, the author cannot create a module for KernelSU. 
+This module is confirmed to be supported for KernelSU, as [confirmed by the author of KernelSU](https://github.com/anasfanani/Magisk-Tailscaled/issues/2#issue-2055047162). If you encounter any problems, please let me know.
 
-If you encounter any issues, you can check the logs at `/data/local/tmp/tailscaled.log`.
+If you encounter any issues, you can check the logs at `/data/adb/tailscale/tmp/tailscaled.log`.
 
 For more information, check out the links below:
 

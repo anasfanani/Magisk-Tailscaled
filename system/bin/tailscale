@@ -1,0 +1,6 @@
+#!/system/bin/sh
+if echo "$@" | grep -q -- '--socket='; then # if socket is specified, use it
+    /data/adb/tailscale/bin/tailscale "$@"
+else # otherwise, use the default socket
+    /data/adb/tailscale/bin/tailscale --socket=/data/adb/tailscale/tmp/tailscaled.sock "$@" 
+fi
