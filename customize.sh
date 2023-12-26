@@ -7,26 +7,26 @@ esac
 ui_print "- Detected architecture: $F_ARCH"
 ui_print "- Copying module files"
 
-L_TARGETDIR="/data/adb/tailscale"
-F_TARGETDIR="/data/adb/tailscale/bin"
+CUSTOM_DIR="/data/adb/tailscale"
+CUSTOM_BIN_DIR="$CUSTOM_DIR/bin"
+CUSTOM_TMP_DIR="$CUSTOM_DIR/tmp"
 
-mkdir -p "$F_TARGETDIR" "$L_TARGETDIR"
+mkdir -p "$CUSTOM_DIR" "$CUSTOM_BIN_DIR" "$CUSTOM_TMP_DIR"
 
-cp "$MODPATH/tailscale/"* "$L_TARGETDIR"
-cp "$MODPATH/files/tailscaled-$F_ARCH" "$F_TARGETDIR/tailscaled"
-cp "$MODPATH/files/tailscale-$F_ARCH" "$F_TARGETDIR/tailscale"
+cp "$MODPATH/tailscale/"* "$CUSTOM_DIR"
+cp "$MODPATH/files/tailscaled-$F_ARCH" "$CUSTOM_BIN_DIR/tailscaled"
+cp "$MODPATH/files/tailscale-$F_ARCH" "$CUSTOM_BIN_DIR/tailscale"
 
 ui_print "- Setting permissions"
 
 # I wont hardcode the binary names here, because I will add other binaries in the future
-# https://github.com/Magisk-Modules-Alt-Repo/submission/issues/209#issuecomment-1865039482
 
-set_perm_recursive $F_TARGETDIR 0 0 0755 0755
+set_perm_recursive $CUSTOM_BIN_DIR 0 0 0755 0755
 set_perm_recursive $MODPATH/system/bin 0 0 0755 0755 
 
 if [ -f "/data/local/tmp/tailscaled.state" ]; then
     ui_print "- Moving existing state file"
-    cp "/data/local/tmp/tailscaled.state" "$L_TARGETDIR/tmp/tailscaled.state"
+    cp "/data/local/tmp/tailscaled.state" "$CUSTOM_TMP_DIR/tailscaled.state"
     rm -f /data/local/tmp/tailscale* # cleanup old files
 fi
 
