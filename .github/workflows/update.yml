@@ -6,9 +6,10 @@ on:
   workflow_dispatch:
     inputs:
       force:
+        type: boolean
         description: 'Force update'
         required: false
-        default: 'false'
+        default: false
 permissions:
   contents: write
 jobs:
@@ -119,8 +120,18 @@ jobs:
       - name: Create zip file
         if: steps.check_version.outputs.exit != 'true'
         run: |
-          zip -r "Magisk-Tailscaled-${{ steps.check_version.outputs.new_tag }}.0.zip" . -x "*.git*"
+          # zip all files
+          zip -9 -r "Magisk-Tailscaled-${{ steps.check_version.outputs.new_tag }}.0.zip" . -x "*.git*"
+          
+          # doing job for arm64
+          sed -i 's/arm)   F_ARCH=$ARCH;;/#arm)   F_ARCH=$ARCH;;/g' customize.sh # disable arm
+          zip -9 -r "Magisk-Tailscaled-arm64-${{ steps.check_version.outputs.new_tag }}.0.zip" . -x "*.git*" "files/tailscale-arm" "files/tailscaled-arm" "*.zip"
   
+          # doing job for arm
+          sed -i 's/#arm)   F_ARCH=$ARCH;;/arm)   F_ARCH=$ARCH;;/g' customize.sh # enable arm
+          sed -i 's/arm64)   F_ARCH=$ARCH;;/#arm64)   F_ARCH=$ARCH;;/g' customize.sh # disable arm64
+          zip -9 -r "Magisk-Tailscaled-arm-${{ steps.check_version.outputs.new_tag }}.0.zip" . -x "*.git*" "files/tailscale-arm64" "files/tailscaled-arm64" "*.zip"
+      
       - name: Create Release
         if: steps.check_version.outputs.exit != 'true'
         id: create_release
@@ -129,7 +140,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           generate_release_notes: true
-          files: ./Magisk-Tailscaled-${{ steps.check_version.outputs.new_tag }}.0.zip
+          files: |
+            Magisk-Tailscaled-${{ steps.check_version.outputs.new_tag }}.0.zip
+            Magisk-Tailscaled-arm64-${{ steps.check_version.outputs.new_tag }}.0.zip
+            Magisk-Tailscaled-arm-${{ steps.check_version.outputs.new_tag }}.0.zip
           name: Magisk Tailscaled ${{ steps.check_version.outputs.new_tag }}.0
           tag_name: ${{ steps.check_version.outputs.new_tag }}.0
       - name: Show output
