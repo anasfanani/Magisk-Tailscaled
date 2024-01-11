@@ -1,7 +1,7 @@
 #!/system/bin/sh
+source /data/adb/tailscale/settings.ini
 if [ $# -eq 0 ]; then # if no arguments are passed, start tailscaled
-    export PATH=/data/adb/tailscale/bin:$PATH
-    /data/adb/tailscale/bin/tailscaled -tun=userspace-networking -statedir=/data/adb/tailscale/tmp/ -state=/data/adb/tailscale/tmp/tailscaled.state -socket=/data/adb/tailscale/tmp/tailscaled.sock -port=41641
+    "${tailscaled_bin}" ${tailscaled_bin_param}
 else # otherwise, run tailscale with the arguments passed
-    /data/adb/tailscale/bin/tailscaled "$@"
+    "${tailscaled_bin}" "$@"
 fi

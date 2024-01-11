@@ -1,0 +1,120 @@
+#!/system/bin/sh
+DIR=${0%/*}
+source $DIR/../settings.ini
+scripts_name=$(basename $0)
+
+start_tailscaled() {
+  sed -Ei "s/^description=(\[.*][[:space:]]*)?/description=[ ⏲ $current_time | ✔ tailscaled service is running!!! ] /g" "$module_prop"
+  PID=$(busybox pidof "${tailscaled_bin}")
+  if [ -n "$PID" ]; then
+    log Info "✔ tailscaled service running with PID : ( $PID )."
+    return
+  fi
+  # The logs time cannot set to current timezone, default is UTC.
+  nohup ${tailscaled_bin} ${tailscaled_bin_param} > "${tailscaled_log}" 2>&1 &
+  PID=$!
+  echo -n $PID > "${tailscaled_pid}"
+  log Info "✔ tailscaled service running with PID : ( $PID )."
+}
+stop_tailscaled(){
+  sed -Ei "s/^description=(\[.*][[:space:]]*)?/description=[ ⏲ $current_time | ✘ tailscaled shutting down, service is stopped !!! ] /g" "$module_prop"
+  # Check if the binary is running using pgrep
+  if busybox pgrep "${tailscaled_bin}" >/dev/null; then
+    # Use `busybox pkill` to kill the binary with signal 15, otherwise use `killall`.
+    if busybox pkill -15 -e "${tailscaled_bin}" >/dev/null 2>&1; then
+      : # Do nothing if busybox pkill is successful
+    else
+      killall -15 "${tailscaled_bin}" >/dev/null 2>&1 || kill -15 "$(busybox pidof "${tailscaled_bin}")" >/dev/null 2>&1
+    fi
+  else
+    log Info "✘ tailscaled service already stop."
+    rm -f "${tailscaled_pid}"
+    [ -t 1 ] && echo -e "${white}--------------------------------------------${normal}"
+    return
+  fi
+  # Check if the binary has stopped
+  sleep 0.5
+  if ! busybox pidof "${tailscaled_bin}" >/dev/null 2>&1; then
+    # Delete the `tailscaled.pid` file if it exists
+    rm -f "${tailscaled_pid}"
+    log Info "✘ tailscaled shutting down, service is stopped."
+    log Info "✘ tailscaled disconnected."
+    [ -t 1 ] && echo -e "${white}--------------------------------------------${normal}"
+  else
+    log Warning "⚠️ tailscaled Not stopped; may still be shutting down or failed to shut down."
+    force_stop
+  fi
+
+  
+}
+force_stop() {
+  # try forcing it to shut down.
+  log Warning "⚠️ try forcing it to shut down."
+  # Use `busybox pkill` to kill the binary with signal 9, otherwise use `killall`.
+  if busybox pkill -9 "${tailscaled_bin}"; then
+    : # Do nothing if busybox pkill is successful
+  else
+    if command -v killall >/dev/null 2>&1; then
+      killall -9 "${tailscaled_bin}" >/dev/null 2>&1 || true
+    else
+      pkill -9 "${tailscaled_bin}" >/dev/null 2>&1 || true
+    fi
+  fi
+  sleep 0.5
+  if ! busybox pidof "${tailscaled_bin}" >/dev/null 2>&1; then
+    log Info "✔ done, you can sleep peacefully."
+    [ -t 1 ] && echo -e "${white}--------------------------------------------${normal}"
+    rm -f "${tailscaled_pid}"
+  fi
+}
+log_view(){
+  case "$1" in
+    runs)
+      busybox less -F~ "${tailscaled_runs_log}"
+      ;;
+    service)
+      busybox less -F~ "${tailscaled_service_log}"
+      ;;
+    tailscaled)
+      busybox tail -q -n +1 -F "${tailscaled_log}"
+      ;;
+    *)
+      if [ -n "$1" ]; then
+        echo "${red}${scripts_name} log $1 not found${normal}"
+      fi
+      echo "${yellow}usage${normal}: ${green}${scripts_name}${normal} ${yellow}log${normal} {${orange}runs|service|tailscaled${normal}}"
+      ;;
+  esac
+  
+}
+case "$1" in
+  start)
+    start_tailscaled
+    ;;
+  stop)
+    stop_tailscaled
+    ;;
+  restart)
+    stop_tailscaled
+    sleep 0.5
+    start_tailscaled
+    ;;
+  status)
+    # Check whether the service is running or not
+    PID=$(busybox pidof "${tailscaled_bin}")
+    if [ -n "$PID" ]; then
+      log Info "✔ tailscaled service is running with PID : ( $PID )."
+    else
+      log Info "✘ tailscaled service is stopped."
+    fi
+    ;;
+  log)
+    log_view $2
+    ;;
+  *)
+    if [ -n "$1" ]; then
+      echo "${red}${scripts_name} $1 not found${normal}"
+    fi
+    echo "${yellow}usage${normal}: ${green}${scripts_name}${normal} {${yellow}start|stop|restart|status|log${normal}{${orange}runs|service|tailscaled${normal}${yellow}}${normal}}"
+    ;;
+esac
