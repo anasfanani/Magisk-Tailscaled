@@ -27,8 +27,8 @@ jobs:
       - name: Check current version is up to date
         id: check_version
         run: |
-          NEW_TAG=$(echo '${{ steps.get_latest_release.outputs.data }}' | jq -r '.tag_name')
-          VERSION=$(echo '${{ steps.get_latest_release.outputs.data }}' | jq -r '.name')
+          NEW_TAG="${{ fromJSON(steps.get_latest_release.outputs.data).tag_name }}" 
+          VERSION="${{ fromJSON(steps.get_latest_release.outputs.data).name }}"
           CURRENT_TAG=$(curl -s https://raw.githubusercontent.com/anasfanani/Magisk-Tailscaled/master/files/VERSION.txt)
           if [[ "$NEW_TAG" == "$CURRENT_TAG" && "${{ github.event.inputs.force }}" != 'true' ]]; then
             echo "Current version is up to date"
