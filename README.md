@@ -18,20 +18,28 @@ The [Tailscale app](https://play.google.com/store/apps/details?id=com.tailscale.
 
 ## Requirements
 
+- A basic networking knowledge.
 - An Android device with Magisk root installed.
-- Currently only support for `arm` or `arm64` architecture.
 
-## Installation
+## Quick Start & Installation
 
 1. Download the latest zip file from the [Releases](https://github.com/anasfanani/Magisk-Tailscaled/releases/latest) page.
-2. Install the downloaded zip file using Magisk.
-3. Reboot your phone.
+2. Install the downloaded zip file using Magisk & reboot your phone.
+3. Open the Terminal.
+4. Login with `su -c tailscale login`
+5. Disable accept-dns `su -c tailscale set --accept-dns=false`
+6. Run 'tailscale login' to login to your Tailscale account.
+7. Open the URL in a browser to authorize your device.
+8. Run 'tailscale ip' to retrieve your Tailscale IP.
+9. Alternatively, you can open the [Tailscale Admin Dashboard](https://login.tailscale.com/admin/machines) to manage your devices.
 
 After installation, the Tailscale daemon (`tailscaled`) will run automatically on boot.
 
-## Atention
+## Limitation
 
-As discussed in [this issue](https://github.com/anasfanani/Magisk-Tailscaled/issues/1#issuecomment-1860837922), I have implemented a wrapper script for the `tailscale` and `tailscaled` commands. This script simplifies the usage of these commands by providing default arguments and handling the `--socket` argument in a specific way. With this script, you can now use `tailscale login` directly without navigating to the `tmp` directory. The wrapper script is located at `/system/bin/tailscale` & `/system/bin/tailscaled`.
+- This module only support for `arm` or `arm64` architecture, you can download manually.
+- Tailscale binary is designed to run in Linux environment, Some feature might not works properly.
+- MagicDNS currently not working.
 
 ## Usage
 
@@ -40,16 +48,8 @@ This module runs `tailscaled` with the following command:
 ```bash
 tailscaled -tun=userspace-networking -statedir=/data/adb/tailscale/tmp/ -state=/data/adb/tailscale/tmp/tailscaled.state -socket=/data/adb/tailscale/tmp/tailscaled.sock -port=41641
 ```
-This command uses a userspace network stack instead of the kernel's network stack, which can be useful on devices where the kernel's network stack is not compatible with Tailscale. The state file for tailscaled is stored at `/data/adb/tailscale/tmp/tailscaled.state`, and the log output is written to `/data/adb/tailscale/tmp/tailscaled.log`.
+This command uses a userspace network stack instead of the kernel's network stack, which can be useful on devices where the kernel's network stack is not compatible with Tailscale. The state file for tailscaled is stored at `/data/adb/tailscale/tmp/tailscaled.state`, and the log output is written to `/data/adb/tailscale/run/tailscaled.log`.
 
-## Instructions
-
-1. Open the Terminal.
-2. Run 'su' to gain root access.
-3. Run 'tailscale login' to login to your Tailscale account.
-4. Open the URL in a browser to authorize your device.
-5. Run 'tailscale ip' to retrieve your Tailscale IP.
-6. Alternatively, you can open the [Tailscale Admin Dashboard](https://login.tailscale.com/admin/machines) to manage your devices.
 
 ## Example of Using Tailscale
 
