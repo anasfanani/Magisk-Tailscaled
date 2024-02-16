@@ -1,6 +1,6 @@
 {
-  "version": "v1.58.2.0",
-  "versionCode": "01580200",
-  "zipUrl": "https://github.com/anasfanani/Magisk-Tailscaled/releases/download/v1.58.2.0/Magisk-Tailscaled-v1.58.2.0.zip",
+  "version": "v1.60.0.0",
+  "versionCode": "01600000",
+  "zipUrl": "https://github.com/anasfanani/Magisk-Tailscaled/releases/download/v1.60.0.0/Magisk-Tailscaled-v1.60.0.0.zip",
   "changelog": "https://raw.githubusercontent.com/anasfanani/Magisk-Tailscaled/master/CHANGELOG.txt"
 }
