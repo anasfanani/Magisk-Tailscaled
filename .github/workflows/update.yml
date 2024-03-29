@@ -51,6 +51,7 @@ jobs:
         if: steps.check_version.outputs.exit != 'true'
         run: |
           PREFIX=${{ steps.check_version.outputs.version }}
+          PREFIX=${PREFIX#v}
           ARCHS=("arm" "arm64")
           mkdir -p files
           cd files
