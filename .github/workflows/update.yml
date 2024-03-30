@@ -75,6 +75,7 @@ jobs:
         if: steps.check_version.outputs.exit != 'true'
         run: |
           versionString="${{ steps.check_version.outputs.version }}.0"
+          versionString=${versionString//[^0-9.]/}
           new_tag="${{ steps.check_version.outputs.new_tag }}.0"
           zipUrl="https://github.com/anasfanani/Magisk-Tailscaled/releases/download/$new_tag/Magisk-Tailscaled-$new_tag.zip"
           IFS='.' read -ra VERSION_PARTS <<< "$versionString"
