@@ -11,9 +11,11 @@ service_control() {
     if [ "${events}" = "d" ]; then
       echo "${current_time} [Info]: ✔ Starting tailscaled service" >> "${tailscaled_service_log}"
       "${tailscaled_service}" start 2>&1 >> "${tailscaled_service_log}"
+      "${tailscaled_tun}" start 2>&1 >> "${tailscaled_service_log}"
     elif [ "${events}" = "n" ]; then
       echo "${current_time} [Info]: ✘ Stopping tailscaled service" >> "${tailscaled_service_log}"
       "${tailscaled_service}" stop 2>&1 >> "${tailscaled_service_log}"
+      "${tailscaled_tun}" stop 2>&1 >> "${tailscaled_service_log}"
     fi
   fi
 }

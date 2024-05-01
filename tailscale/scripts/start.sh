@@ -22,9 +22,16 @@ start_inotifyd() {
   echo "${current_time} [Info]: Starting tailscaled inotify service" > "${tailscaled_service_log}"
   inotifyd "${tailscaled_inotify}" "${module_dir}" >> "/dev/null" 2>&1 &
 }
+start_socks5tunnel(){
+  if [ ! -f "${module_dir}/disable" ]; then
+    echo "${current_time} [Info]: Starting socks5tunnel service" > "${tailscaled_service_log}"
+    "${tailscaled_tun}" start >> "/dev/null" 2>&1
+  fi
+}
 mkdir -p ${tailscaled_run_dir}
 rm -f ${tailscaled_runs_log}
 module_version=$(busybox awk -F'=' '!/^ *#/ && /version=/ { print $2 }' "$module_prop" 2>/dev/null)
 log Info "Magisk Tailscaled version : ${module_version}."
 start_service
+start_socks5tunnel
 start_inotifyd
