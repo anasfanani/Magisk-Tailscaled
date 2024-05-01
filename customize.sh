@@ -44,11 +44,15 @@ unzip -qqjo "$ZIPFILE" 'tailscale/bin/*' -d "$CUSTOM_BIN_DIR"
 unzip -qqjo "$ZIPFILE" 'tailscale/scripts/*' -d "$CUSTOM_SCRIPTS_DIR"
 unzip -qqjo "$ZIPFILE" 'tailscale/settings.ini' -d "$CUSTOM_DIR"
 
-ui_print "- Extracting binaries"
+ui_print "- Extracting tailscale & tailscaled binaries"
 unzip -qqjo "$ZIPFILE" "files/tailscaled-$F_ARCH" -d "$TMPDIR"
 unzip -qqjo "$ZIPFILE" "files/tailscale-$F_ARCH" -d "$TMPDIR"
 mv -f "$TMPDIR/tailscaled-$F_ARCH" "$CUSTOM_BIN_DIR/tailscaled"
 mv -f "$TMPDIR/tailscale-$F_ARCH" "$CUSTOM_BIN_DIR/tailscale"
+
+ui_print "- Extracting hev-socks5-tunnel binaries"
+unzip -qqjo "$ZIPFILE" "files/hev-socks5-tunnel-linux-$F_ARCH" -d "$TMPDIR"
+mv -f "$TMPDIR/hev-socks5-tunnel-linux-$F_ARCH" "$CUSTOM_BIN_DIR/socks5-tunnel"
 
 ui_print "- Setting permissions"
 set_perm_recursive $CUSTOM_BIN_DIR 0 0 0755 0755
@@ -67,14 +71,14 @@ if [ ! -f "$SERVICE_DIR/tailscaled_service.sh" ]; then
     ui_print "- Because the Developer Guides mentioned :"
     ui_print "  Modules should NOT add general scripts during installation."
     ui_print "- I offer this option to you."
-    ui_print "- You have 30 seconds to make a selection. Default is [Yes]."
+    ui_print "- You have 10 seconds to make a selection. Default is [Yes]."
     ui_print "- [ Vol UP(+): Yes ]"
     ui_print "- [ Vol DOWN(-): No ]"
     start_time=`date +%s`
     while true; do
       current_time=`date +%s`
       time_diff=`expr $current_time - $start_time`
-      if [ $time_diff -ge 30 ]; then
+      if [ $time_diff -ge 10 ]; then
         ui_print "- Time's up! Proceeding with default option [Yes]."
         ui_print "- Move Module Scripts to General Scripts."
         mv -f "$MODPATH/service.sh" "$SERVICE_DIR/tailscaled_service.sh"
