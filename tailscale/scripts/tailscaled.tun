@@ -1,0 +1,100 @@
+#!/system/bin/sh
+DIR=${0%/*}
+source $DIR/../settings.ini
+scripts_name=$(basename $0)
+
+start_tun(){
+    PID=$(busybox pidof "${socks5_tun_bin}")
+    if [ -n "$PID" ]; then
+        log Info "✔ socks5-tunnel service already running with PID : ( $PID )."
+        return
+    fi
+    # The logs time cannot set to current timezone, default is UTC.
+    nohup ${socks5_tun_bin} ${socks5_tun_conf} > "${socks5_tun_log}" 2>&1 &
+    PID=$!
+    echo -n $PID > "${socks5_tun_pid}"
+    log Info "✔ socks5-tunnel service running with PID : ( $PID )."
+    sh ${socks5_tun_pre_up}
+}
+
+stop_tun(){
+    # Check if the binary is running using pgrep
+    if busybox pgrep "${socks5_tun_bin}" >/dev/null; then
+        sh ${socks5_tun_pre_down}
+        # Use `busybox pkill` to kill the binary with signal 15, otherwise use `killall`.
+        if busybox pkill -15 -e "${socks5_tun_bin}" >/dev/null 2>&1; then
+        : # Do nothing if busybox pkill is successful
+        else
+        killall -15 "${socks5_tun_bin}" >/dev/null 2>&1 || kill -15 "$(busybox pidof "${socks5_tun_bin}")" >/dev/null 2>&1
+        fi
+    else
+        log Info "✘ socks5-tunnel service already stop."
+        rm -f "${socks5_tun_pid}"
+        [ -t 1 ] && echo -e "${white}--------------------------------------------${normal}"
+        return
+    fi
+    # Check if the binary has stopped
+    sleep 0.5
+    if ! busybox pidof "${socks5_tun_bin}" >/dev/null 2>&1; then
+        # Delete the `socks5-tunnel.pid` file if it exists
+        rm -f "${socks5_tun_pid}"
+        log Info "✘ socks5-tunnel shutting down, service is stopped."
+        log Info "✘ socks5-tunnel disconnected."
+        [ -t 1 ] && echo -e "${white}--------------------------------------------${normal}"
+    else
+        log Warning "⚠️ socks5-tunnel Not stopped; may still be shutting down or failed to shut down."
+        force_stop
+    fi
+    
+}
+force_stop() {
+  # try forcing it to shut down.
+  log Warning "⚠️ try forcing it to shut down."
+  # Use `busybox pkill` to kill the binary with signal 9, otherwise use `killall`.
+  if busybox pkill -9 "${socks5_tun_bin}"; then
+    : # Do nothing if busybox pkill is successful
+  else
+    if command -v killall >/dev/null 2>&1; then
+      killall -9 "${socks5_tun_bin}" >/dev/null 2>&1 || true
+    else
+      pkill -9 "${socks5_tun_bin}" >/dev/null 2>&1 || true
+    fi
+  fi
+  sleep 0.5
+  if ! busybox pidof "${socks5_tun_bin}" >/dev/null 2>&1; then
+    log Info "✔ done, you can sleep peacefully."
+    [ -t 1 ] && echo -e "${white}--------------------------------------------${normal}"
+    rm -f "${socks5_tun_pid}"
+  fi
+}
+case "$1" in
+  start)
+    start_tun
+    ;;
+  stop)
+    stop_tun
+    ;;
+  restart)
+    stop_tun
+    sleep 0.5
+    start_tun
+    ;;
+  status)
+    # Check whether the service is running or not
+    PID=$(busybox pidof "${socks5_tun_bin}")
+    if [ -n "$PID" ]; then
+      log Info "✔ socks5-tunnel for tailscaled service is running with PID : ( $PID )."
+    else
+      log Info "✘ socks5-tunnel for tailscaled service is stopped."
+    fi
+    ;;
+  log)
+    log_view $2
+    ;;
+  *)
+    if [ -n "$1" ]; then
+      echo "${red}${scripts_name} $1 not found${normal}"
+    fi
+    echo "${yellow}usage${normal}: ${green}${scripts_name}${normal} {${yellow}start|stop|restart|status${normal}}"
+    ;;
+esac
