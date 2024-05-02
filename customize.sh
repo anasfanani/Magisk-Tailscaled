@@ -11,9 +11,6 @@ elif [ "$KSU" = true ] && [ "$KSU_VER_CODE" -lt 10670 ]; then
 fi
 
 SERVICE_DIR="/data/adb/service.d"
-if [ "$KSU" = true ]; then
-  SERVICE_DIR="/data/adb/ksu/service.d"
-fi
 
 CUSTOM_DIR="/data/adb/tailscale"
 CUSTOM_BIN_DIR="$CUSTOM_DIR/bin"
