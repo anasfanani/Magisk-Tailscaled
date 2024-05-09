@@ -127,12 +127,12 @@ jobs:
           
           # doing job for arm64
           sed -i 's/arm)   F_ARCH=$ARCH;;/#arm)   F_ARCH=$ARCH;;/g' customize.sh # disable arm
-          zip -9 -r "Magisk-Tailscaled-arm64-${{ steps.check_version.outputs.new_tag }}.0.zip" . -x "*.git*" "files/tailscale-arm" "files/tailscaled-arm" "*.zip"
+          zip -9 -r "Magisk-Tailscaled-arm64-${{ steps.check_version.outputs.new_tag }}.0.zip" . -x "*.git*" "files/tailscale-arm" "files/tailscaled-arm" "files/hev-socks5-tunnel-linux-arm" "*.zip"
   
           # doing job for arm
           sed -i 's/#arm)   F_ARCH=$ARCH;;/arm)   F_ARCH=$ARCH;;/g' customize.sh # enable arm
           sed -i 's/arm64)   F_ARCH=$ARCH;;/#arm64)   F_ARCH=$ARCH;;/g' customize.sh # disable arm64
-          zip -9 -r "Magisk-Tailscaled-arm-${{ steps.check_version.outputs.new_tag }}.0.zip" . -x "*.git*" "files/tailscale-arm64" "files/tailscaled-arm64" "*.zip"
+          zip -9 -r "Magisk-Tailscaled-arm-${{ steps.check_version.outputs.new_tag }}.0.zip" . -x "*.git*" "files/tailscale-arm64" "files/tailscaled-arm64" "files/hev-socks5-tunnel-linux-arm64" "*.zip"
       
       - name: Create Release
         if: steps.check_version.outputs.exit != 'true'
