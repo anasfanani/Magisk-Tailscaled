@@ -172,7 +172,7 @@ For more details about CLI commands, check out the [Tailscale CLI documentation]
 
 Tailscale has manny issues. You can check them out [here](https://github.com/tailscale/tailscale/issues).
 
-#### Cannot access other tailnet devices
+### Cannot access other tailnet devices
 
 This module runs the `tailscaled` binary in userspace-networking mode. To access other devices in the tailnet, you must use a local proxy on port 1099. I've implemented a workaround using `hev-socks5-tunnel` to tunnel local socks5 on port 1099 and bind it to the interface named `tailscale0`. 
 
@@ -185,20 +185,22 @@ This solution should work on most common devices. However, if you encounter prob
 3. Check if your device is connected to tailscaled and try a ping connection with `tailscale ping <your_tailnet_ip>`.
 4. Verify the port you want to access is accessible. You can do this by accessing it with another tailscale device or using the Tailscale Android App.
 5. Check if the local socks5 server is working with curl. Execute the following command:
-  ```
-  curl 1.1.1.1 -vI -x localhost:1099
-  ```
-  If it connects, then the local socks5 server is running and working.
+    ```
+    curl 1.1.1.1 -vI -x localhost:1099
+    ```
+    If it connects, then the local socks5 server is running and working.
+
 6. Check if the local socks5 server can connect to the tailnet network.
-  ```
-  curl <your_tailnet_ip>:<port> -vI -x localhost:1099
-  ```
-  If it connects, then the local socks5 server is functioning correctly.
+    ```
+    curl <your_tailnet_ip>:<port> -vI -x localhost:1099
+    ```
+    If it connects, then the local socks5 server is functioning correctly.
+
 7. Finally, check the connection directly with `curl <your_tailnet_ip>:<port> -vI`.
 
 If the last step fails, the problem likely lies with `socks5-tun`. Verify there is an interface named `tailscale0`. If it exists, the problem may be with the iptables route, either due to a conflict with another rule or some other issue. Feel free to explore your own solutions. If you're unable to resolve the issue, contact me on Telegram and I'll see if I can assist you.
 
-#### My subnet-routes is'nt working
+### My subnet-routes is'nt working
 
 Yes because we need define the routes with `iptables` in file `tailscaled.tun.up` and `tailscaled.tun.down`, you can check this [issue reference](https://github.com/anasfanani/Magisk-Tailscaled/issues/17).
 I suppose you're already know the iptables works, if dont, there are chatAI to ask.
@@ -206,21 +208,21 @@ You can copy whole `tailscaled.tun.up` script to chatAI and send instruction wit
 
 If you still can't do it by yourself, I'm verry welcome to people who needs help.
 
-#### Exit nodes
+### Exit nodes
 
 You can check this [issue reference](https://github.com/anasfanani/Magisk-Tailscaled/issues/17).
 
-#### ipv6
+### ipv6
 
 Unfortunately, I'm verry lazy to learn ipv6.
 
-#### Headscale 
+### Headscale 
 
 Check [this](https://github.com/anasfanani/Magisk-Tailscaled/issues/19#issuecomment-2091579177).
 Also explore on the issue first, then you can ask trough telegram.
 
 
-#### Other Error & Bugs
+### Other Error & Bugs
 
 You can explore to the issue tab, if there not exists, you can open issue, for help me resolve the problem, you can include fresh log.
 
