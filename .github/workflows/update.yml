@@ -1,8 +1,8 @@
 name: Check and Update Tailscale Binary
 
 on:
-  schedule:
-    - cron: '0 0 * * *' # Runs every day at midnight
+  # schedule:
+  #   - cron: '0 0 * * *' # Runs every day at midnight
   workflow_dispatch:
     inputs:
       force:
