@@ -33,5 +33,5 @@ rm -f ${tailscaled_runs_log}
 module_version=$(busybox awk -F'=' '!/^ *#/ && /version=/ { print $2 }' "$module_prop" 2>/dev/null)
 log Info "Magisk Tailscaled version : ${module_version}."
 start_service
-start_socks5tunnel
+# start_socks5tunnel # no longer run automatically at boot, because ndk build work, except you're using verry obsoleted android device
 start_inotifyd

@@ -1,0 +1,236 @@
+name: Build tailscale for Android
+on:
+  workflow_dispatch:
+    inputs:
+      increment:
+        type: boolean
+        description: 'Increment version'
+        required: false
+        default: true
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Get latest stable release from tailscale
+      id: get_stable_release
+      uses: octokit/request-action@v2.x
+      with:
+        route: GET /repos/tailscale/tailscale/releases/latest
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Get latest tag
+      run: |
+        latestTag="${{ fromJSON(steps.get_stable_release.outputs.data).tag_name }}"
+        echo "Latest tag: $latestTag"
+        echo "LATEST_TAILSCALE_VERSION_TAG=${latestTag}" >> $GITHUB_ENV
+      shell: bash
+
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Go 1.22.x
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22.x'
+    
+    - name: Display Go version
+      run: go version
+
+    - name: Install Android NDK
+      id: setup-ndk
+      uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: r26d
+        add-to-path: false
+
+    - name: Display NDK path
+      run: |
+        echo "NDK path: ${{ steps.setup-ndk.outputs.ndk-path }}"
+        ls -la ${{ steps.setup-ndk.outputs.ndk-path }}
+
+    
+
+    - name: Download latest Tailscale source code
+      run: |
+        mkdir -p build
+        cd build
+        latestTarballurl="${{ fromJSON(steps.get_stable_release.outputs.data).tarball_url }}"
+        mkdir -p tailscale
+        curl -L $latestTarballurl -o tailscale.tar.gz
+        tar -xzf tailscale.tar.gz -C tailscale --strip-components=1
+        ls -la tailscale
+        rm tailscale.tar.gz
+        cd ..
+
+    - name: Build Tailscale for Android
+      run: |
+        mkdir -p dist/arm64
+        mkdir -p dist/arm
+        cd build/tailscale
+
+        # Generate Version Info
+        eval `CGO_ENABLED=0 GOOS=$(go env GOHOSTOS) GOARCH=$(go env GOHOSTARCH) go run ./cmd/mkversion`
+        ldflags="-X tailscale.com/version.longStamp=${VERSION_LONG} -X tailscale.com/version.shortStamp=${VERSION_SHORT}"
+
+        # Store the version info to environment variables
+        echo "BUILD_TAILSCALE_VERSION=${VERSION_SHORT}" >> $GITHUB_ENV
+
+        NDK_BIN_PATH="${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+
+        # Build for Android
+        echo "ldflags: $ldflags"
+        echo "NDK_BIN_PATH: $NDK_BIN_PATH"
+
+        echo "Building for arm"
+        CC=${NDK_BIN_PATH}/armv7a-linux-androideabi21-clang CXX=${NDK_BIN_PATH}/armv7a-linux-androideabi21-clang++ CGO_ENABLED=1 GOOS=android GOARCH=arm go build -tags ts_include_cli -ldflags "$ldflags -s -w" -o ../../dist/tailscale.combined-arm -trimpath ./cmd/tailscaled
+        file ../../dist/tailscale.combined-arm
+        
+        echo "Building for arm64"
+        CC=${NDK_BIN_PATH}/aarch64-linux-android21-clang CXX=${NDK_BIN_PATH}/aarch64-linux-android21-clang++ CGO_ENABLED=1 GOOS=android GOARCH=arm64 go build -tags ts_include_cli -ldflags "$ldflags -s -w" -o ../../dist/tailscale.combined-arm64 -trimpath ./cmd/tailscaled
+        file ../../dist/tailscale.combined-arm64
+
+        cd ../..
+        rm -rf build
+
+    - name: Install UPX
+      uses: crazy-max/ghaction-upx@v3
+      with:
+        install-only: true
+
+    - name: Compress binaries
+      run: |
+        # https://tailscale.com/kb/1207/small-tailscale
+        upx --version
+        echo "Compressing tailscale binaries for arm"
+        du -hs ./dist/tailscale.combined-arm
+        upx --lzma --best ./dist/tailscale.combined-arm
+        du -hs ./dist/tailscale.combined-arm
+
+        echo "Compressing tailscale binaries for arm64"
+        du -hs ./dist/tailscale.combined-arm64
+        upx --lzma --best ./dist/tailscale.combined-arm64
+        du -hs ./dist/tailscale.combined-arm64
+
+        echo "Moving compressed binaries to files directory"
+        mkdir -p files
+        mv ./dist/tailscale.combined-arm files/tailscale.combined-arm
+        mv ./dist/tailscale.combined-arm64 files/tailscale.combined-arm64
+        rm -rf dist
+    # - name: Upload artifacts
+    #   uses: actions/upload-artifact@v4
+    #   with:
+    #     name: tailscale.combined
+    #     path: ./dist/
+
+    - name: Update repository
+      run: |
+        # Store the version info to environment variables
+        echo "OLD_TAILSCALE_VERSION_TAG=$(cat files/VERSION.txt)" >> $GITHUB_ENV
+        echo "${{ env.LATEST_TAILSCALE_VERSION_TAG }}" > files/VERSION.txt
+        versionString="${{ env.LATEST_TAILSCALE_VERSION_TAG }}.0"
+
+        # Update changelog
+        touch CHANGELOG.md
+        echo "## ${versionString}" >> CHANGELOG.md
+        echo "- Update Tailscale binaries to ${{ env.LATEST_TAILSCALE_VERSION_TAG }}" >> CHANGELOG.md
+
+        IFS='.' read -ra VERSION_PARTS <<< "${versionString//[^0-9.]/}" # Get numeric version parts
+        newVersionCode=$(printf "%02d%02d%02d%02d" "${VERSION_PARTS[0]}" "${VERSION_PARTS[1]}" "${VERSION_PARTS[2]}" "${VERSION_PARTS[3]}") # Get version code number
+
+        # Update module.prop
+        sed -i "s/^version=.*/version=${versionString}/" module.prop
+        sed -i "s/^versionCode=.*/versionCode=$newVersionCode/" module.prop
+
+        # Estimate the zip url location
+        zipUrl="https://github.com/anasfanani/Magisk-Tailscaled/releases/download/$versionString/Magisk-Tailscaled-$versionString.zip" # Universal
+        zipUrl_arm="https://github.com/anasfanani/Magisk-Tailscaled/releases/download/$versionString/Magisk-Tailscaled-arm-$versionString.zip" # Arm
+        zipUrl_arm64="https://github.com/anasfanani/Magisk-Tailscaled/releases/download/$versionString/Magisk-Tailscaled-arm64-$versionString.zip" # Arm64
+
+        # Update update.json
+        jq '.version = $newVersion | .versionCode = $newVersionCode | .zipUrl = $newZipUrl | .changelog = $newChangelog' \
+          --arg newVersion "${versionString}" \
+          --arg newVersionCode "$newVersionCode" \
+          --arg newZipUrl "$zipUrl" \
+          --arg newChangelog "https://raw.githubusercontent.com/anasfanani/Magisk-Tailscaled/master/CHANGELOG.md" \
+          update.json > temp.json && mv temp.json update.json
+
+        # Update update-arm.json
+        cp update.json update-arm.json
+        jq '.version = $newVersion | .versionCode = $newVersionCode | .zipUrl = $newZipUrl | .changelog = $newChangelog' \
+          --arg newVersion "${versionString}-arm" \
+          --arg newVersionCode "$newVersionCode" \
+          --arg newZipUrl "$zipUrl_arm" \
+          --arg newChangelog "https://raw.githubusercontent.com/anasfanani/Magisk-Tailscaled/master/CHANGELOG.md" \
+          update-arm.json > temp.json && mv temp.json update-arm.json
+
+        # Update update-arm64.json
+        cp update.json update-arm64.json
+        jq '.version = $newVersion | .versionCode = $newVersionCode | .zipUrl = $newZipUrl | .changelog = $newChangelog' \
+          --arg newVersion "${versionString}-arm64" \
+          --arg newVersionCode "$newVersionCode" \
+          --arg newZipUrl "$zipUrl_arm64" \
+          --arg newChangelog "https://raw.githubusercontent.com/anasfanani/Magisk-Tailscaled/master/CHANGELOG.md" \
+          update-arm64.json > temp.json && mv temp.json update-arm64.json
+
+    - name: Commit and push
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        ARCHS=("arm" "arm64")
+        for ARCH in ${ARCHS[@]}; do
+          if [[ -f files/tailscale.combined-${ARCH} ]]; then
+            git add files/tailscale.combined-${ARCH}
+            if git diff --staged --quiet; then
+              echo "No changes to commit update ${{ env.LATEST_TAILSCALE_VERSION_TAG }}"
+            fi
+          else
+            echo "Files for architecture $ARCH do not exist"
+            exit 1;
+          fi
+        done
+        git add .
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Updated from ${{ env.OLD_TAILSCALE_VERSION_TAG }} to ${{ env.LATEST_TAILSCALE_VERSION_TAG }}"
+          git tag ${{ env.LATEST_TAILSCALE_VERSION_TAG }}.0
+          git push origin ${{ env.LATEST_TAILSCALE_VERSION_TAG }}.0
+          git push
+        fi
+  
+    - name: Create Zip file for release
+      run: |
+        versionString="${{ env.LATEST_TAILSCALE_VERSION_TAG }}.0"
+        mkdir -p dist
+
+        # zip all files
+        zip -9 -r "./dist/Magisk-Tailscaled-${versionString}.zip" . -x "*.git*" "dist/*" "*.zip" "*.json"
+
+        # zip all files for arm
+        zip -9 -r "./dist/Magisk-Tailscaled-arm-${versionString}.zip" . -x "*.git*" "dist/*" "*.zip" "*.json" "files/tailscale.combined-arm64" "files/hev-socks5-tunnel-linux-arm64"
+
+        # zip all files for arm64
+        zip -9 -r "./dist/Magisk-Tailscaled-arm64-${versionString}.zip" . -x "*.git*" "dist/*" "*.zip" "*.json" "files/tailscale.combined-arm" "files/hev-socks5-tunnel-linux-arm"
+
+        cd ..
+
+    - name: Create Release
+      id: create_release
+      uses: softprops/action-gh-release@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        body_path: CHANGELOG.md
+        append_body: true
+        generate_release_notes: true
+        make_latest: true
+        files: |
+          ./dist/Magisk-Tailscaled-${{ env.LATEST_TAILSCALE_VERSION_TAG }}.0.zip
+          ./dist/Magisk-Tailscaled-arm64-${{ env.LATEST_TAILSCALE_VERSION_TAG }}.0.zip
+          ./dist/Magisk-Tailscaled-arm-${{ env.LATEST_TAILSCALE_VERSION_TAG }}.0.zip
+        name: Magisk Tailscaled ${{ env.LATEST_TAILSCALE_VERSION_TAG }}.0
+        tag_name: ${{ env.LATEST_TAILSCALE_VERSION_TAG }}.0
+
