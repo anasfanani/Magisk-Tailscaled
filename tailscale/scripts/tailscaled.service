@@ -5,16 +5,36 @@ scripts_name=$(basename $0)
 
 start_tailscaled() {
   sed -Ei "s/^description=(\[.*][[:space:]]*)?/description=[ ⏲ $current_time | ✔ tailscaled service is running!!! ] /g" "$module_prop"
-  PID=$(busybox pidof "${tailscaled_bin}")
+  PID=$(busybox pgrep "${tailscaled_bin}")
   if [ -n "$PID" ]; then
-    log Info "✔ tailscaled service running with PID : ( $PID )."
+    PID_INFO=$(ps -p $PID -o pid,stime,cmd | grep $PID)
+    log Info "✔ tailscaled service already running with PID : ( $PID )."
+    read pid stime cmd <<< "$PID_INFO"
+    log Info "Start time: $stime"
     return
   fi
   # The logs time cannot set to current timezone, default is UTC.
+  [ -f "${tailscaled_log}" ] && mv "${tailscaled_log}" "${tailscaled_log}.bak"; # for debugging
   nohup ${tailscaled_bin} ${tailscaled_bin_param} > "${tailscaled_log}" 2>&1 &
   PID=$!
-  echo -n $PID > "${tailscaled_pid}"
-  log Info "✔ tailscaled service running with PID : ( $PID )."
+  
+  # Fetch process information
+  PID_INFO=$(ps -p $PID -o pid,stime,cmd | grep $PID)
+
+  # Check if we found the process
+  if [ -n "$PID_INFO" ]; then
+      # Read the fetched information into variables
+      read pid stime cmd <<< "$PID_INFO"
+      # Output detailed information
+      log Info "✔ tailscaled service running with PID : ( $PID )."
+      log Info "Start time: $stime"
+      log Info "Command: $cmd"
+      echo -n $PID > "${tailscaled_pid}"
+  else
+      log Error "No process with PID $PID found."
+      [ -f "${tailscaled_log}" ] && { log Error "Check ${tailscaled_log} for more information !"; } || { log Error "No output from command, please start manual with this command and see the response."; log Info "HOME=/data/adb/tailscale/tmp ${tailscaled_bin} ${tailscaled_bin_param}"; }
+  fi
+  
 }
 stop_tailscaled(){
   sed -Ei "s/^description=(\[.*][[:space:]]*)?/description=[ ⏲ $current_time | ✘ tailscaled shutting down, service is stopped !!! ] /g" "$module_prop"
@@ -24,7 +44,7 @@ stop_tailscaled(){
     if busybox pkill -15 -e "${tailscaled_bin}" >/dev/null 2>&1; then
       : # Do nothing if busybox pkill is successful
     else
-      killall -15 "${tailscaled_bin}" >/dev/null 2>&1 || kill -15 "$(busybox pidof "${tailscaled_bin}")" >/dev/null 2>&1
+      killall -15 "${tailscaled_bin}" >/dev/null 2>&1 || kill -15 "$(busybox pgrep "${tailscaled_bin}")" >/dev/null 2>&1
     fi
   else
     log Info "✘ tailscaled service already stop."
@@ -34,7 +54,7 @@ stop_tailscaled(){
   fi
   # Check if the binary has stopped
   sleep 0.5
-  if ! busybox pidof "${tailscaled_bin}" >/dev/null 2>&1; then
+  if ! busybox pgrep "${tailscaled_bin}" >/dev/null 2>&1; then
     # Delete the `tailscaled.pid` file if it exists
     rm -f "${tailscaled_pid}"
     log Info "✘ tailscaled shutting down, service is stopped."
@@ -61,10 +81,22 @@ force_stop() {
     fi
   fi
   sleep 0.5
-  if ! busybox pidof "${tailscaled_bin}" >/dev/null 2>&1; then
+  if ! busybox pgrep "${tailscaled_bin}" >/dev/null 2>&1; then
     log Info "✔ done, you can sleep peacefully."
     [ -t 1 ] && echo -e "${white}--------------------------------------------${normal}"
     rm -f "${tailscaled_pid}"
+  fi
+}
+
+status_tailscaled(){
+  PID=$(busybox pgrep "${tailscaled_bin}")
+  if [ -n "$PID" ]; then
+    log Info "✔ tailscaled service is running with PID : ( $PID )."
+    log Info "Start command: ${tailscaled_bin} ${tailscaled_bin_param}"
+    log Info "Logs dir: ${tailscaled_run_dir}"
+    return
+  else
+    log Info "✘ tailscaled service is stopped."
   fi
 }
 log_view(){
@@ -100,13 +132,7 @@ case "$1" in
     start_tailscaled
     ;;
   status)
-    # Check whether the service is running or not
-    PID=$(busybox pidof "${tailscaled_bin}")
-    if [ -n "$PID" ]; then
-      log Info "✔ tailscaled service is running with PID : ( $PID )."
-    else
-      log Info "✘ tailscaled service is stopped."
-    fi
+    status_tailscaled
     ;;
   log)
     log_view $2

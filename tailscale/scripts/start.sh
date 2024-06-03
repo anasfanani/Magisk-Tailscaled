@@ -2,11 +2,6 @@
 DIR=${0%/*}
 source $DIR/../settings.ini
 
-stop_service() {
-  if [ -f "${tailscaled_run_dir}/tailscaled.pid" ]; then
-    "${tailscaled_service}" stop >> "/dev/null" 2>&1
-  fi
-}
 start_service() {
   if [ ! -f "${module_dir}/disable" ]; then
     "${tailscaled_service}" start >> "/dev/null" 2>&1
