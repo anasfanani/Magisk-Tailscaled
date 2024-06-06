@@ -190,8 +190,10 @@ status_tailscaled(){
       if [ $? -ne 0 ]; then
         if echo "$tailscale_ip" | grep -q 'NeedsLogin'; then
           echo "  ↳ ipv4  \t\t\t${red}need login${normal}"
+        elif echo "$tailscale_ip" | grep -q 'NoState'; then
+          echo "  ↳ ipv4  \t\t\t${red}not connected to network${normal}"
         else
-          echo "  ↳ ipv4  \t\t\t${red}error${normal}"
+          echo "  ↳ ipv4  \t\t\t${red}error: ${tailscale_ip}${normal}"
         fi
       else
         ipv4=$(echo "$tailscale_ip" | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
@@ -282,34 +284,34 @@ _coredns(){
   pre_down="coredns_pre_down"
   post_up="coredns_post_up"
   post_down=""
-  check_bin(){
-    if ! [ -f "${coredns_bin}" ]; then
-      log Info "Downloading Coredns.."
-      arch=$(case "$(uname -m)" in aarch64|arm64) echo "arm64" ;; *) echo "arm" ;; esac)
-      busybox wget --no-check-certificate "https://mirror.ghproxy.com/https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/coredns-${arch}" -O "${coredns_bin}"
-      if ! [ -f "${coredns_bin}" ]; then
-        log Error "Download error, manual download coredns from https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/coredns-${arch} and extract to ${coredns_bin}"
-        return;
-      fi
-      chown root:net_bt_admin ${coredns_bin}
-      chmod +x ${coredns_bin}
-    fi
-    if ! [ -f "${coredns_conf}" ];then
-      log Info "Downloading default config.."
-      busybox wget --no-check-certificate "https://mirror.ghproxy.com/https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/Corefile" -O "${coredns_conf}"
-      if ! [ -f "${coredns_conf}" ]; then
-        log Error "Download error, manual download Corefile from https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/Corefile and extract to ${coredns_conf}"
-        return;
-      fi
-      log Info "config is located at ${coredns_conf}, you need take a look at the file and change it if needed, and restart the service after edit config"
-    fi
-  }
-  check_bin
   case "$1" in
     status)
       program check
     ;;
     start)
+      check_bin(){
+        if ! [ -f "${coredns_bin}" ]; then
+          log Info "Downloading Coredns.."
+          arch=$(case "$(uname -m)" in aarch64|arm64) echo "arm64" ;; *) echo "arm" ;; esac)
+          busybox wget --no-check-certificate "https://mirror.ghproxy.com/https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/coredns-${arch}" -O "${coredns_bin}"
+          if ! [ -f "${coredns_bin}" ]; then
+            log Error "Download error, manual download coredns from https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/coredns-${arch} and extract to ${coredns_bin}"
+            return;
+          fi
+          chown root:net_bt_admin ${coredns_bin}
+          chmod +x ${coredns_bin}
+        fi
+        if ! [ -f "${coredns_conf}" ];then
+          log Info "Downloading default config.."
+          busybox wget --no-check-certificate "https://mirror.ghproxy.com/https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/Corefile" -O "${coredns_conf}"
+          if ! [ -f "${coredns_conf}" ]; then
+            log Error "Download error, manual download Corefile from https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/Corefile and extract to ${coredns_conf}"
+            return;
+          fi
+          log Info "config is located at ${coredns_conf}, you need take a look at the file and change it if needed, and restart the service after edit config"
+        fi
+      }
+      check_bin
       program check
       if [ $? -ne 0 ]; then return; fi
       if [ $tailscaled_tun_mode = "userspace-networking" ];then
@@ -387,34 +389,34 @@ _hevsocks(){
   pre_down="hevsocks_down"
   post_up="hevsocks_up"
   post_down=""
-  check_bin(){
-    if ! [ -f "${bin_file}" ]; then
-      log Info "Downloading Hevsocks.."
-      arch=$(case "$(uname -m)" in aarch64|arm64) echo "arm64" ;; *) echo "arm" ;; esac)
-      busybox wget --no-check-certificate "https://mirror.ghproxy.com/https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/hevsocks-${arch}" -O "${hevsocks_bin}"
-      if ! [ -f "${hevsocks_bin}" ]; then
-        log Error "Download error, manual download hevsocks from https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/hevsocks-${arch} and extract to ${hevsocks_bin}"
-        return;
-      fi
-      chown root:net_bt_admin ${bin_file}
-      chmod +x ${bin_file}
-    fi
-    if ! [ -f "${hevsocks_conf}" ];then
-      log Info "Downloading default config.."
-      busybox wget --no-check-certificate "https://mirror.ghproxy.com/https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/hevsocks.yaml" -O "${hevsocks_conf}"
-      if ! [ -f "${hevsocks_conf}" ]; then
-        log Error "Download error, manual download config from https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/hevsocks.yaml and extract to ${hevsocks_conf}"
-        return;
-      fi
-      log Info "config is located at ${hevsocks_conf}, you need take a look at the file and change it if needed, and restart service after edit config"
-    fi
-  }
-  check_bin
   case "$1" in
     status)
       program check
     ;;
     start)
+      check_bin(){
+        if ! [ -f "${bin_file}" ]; then
+          log Info "Downloading Hevsocks.."
+          arch=$(case "$(uname -m)" in aarch64|arm64) echo "arm64" ;; *) echo "arm" ;; esac)
+          busybox wget --no-check-certificate "https://mirror.ghproxy.com/https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/hevsocks-${arch}" -O "${hevsocks_bin}"
+          if ! [ -f "${hevsocks_bin}" ]; then
+            log Error "Download error, manual download hevsocks from https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/hevsocks-${arch} and extract to ${hevsocks_bin}"
+            return;
+          fi
+          chown root:net_bt_admin ${bin_file}
+          chmod +x ${bin_file}
+        fi
+        if ! [ -f "${hevsocks_conf}" ];then
+          log Info "Downloading default config.."
+          busybox wget --no-check-certificate "https://mirror.ghproxy.com/https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/hevsocks.yaml" -O "${hevsocks_conf}"
+          if ! [ -f "${hevsocks_conf}" ]; then
+            log Error "Download error, manual download config from https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/hevsocks.yaml and extract to ${hevsocks_conf}"
+            return;
+          fi
+          log Info "config is located at ${hevsocks_conf}, you need take a look at the file and change it if needed, and restart service after edit config"
+        fi
+      }
+      check_bin
       program check
       if [ $? -ne 0 ]; then return; fi
       if [ $tailscaled_tun_mode != "userspace-networking" ];then
@@ -573,7 +575,7 @@ help(){
       echo "  ${yellow}↳${normal} ${orange}enable${normal}  \t- Enable autorun Coredns service."
       echo "  ${yellow}↳${normal} ${orange}disable${normal} \t- Disable autorun Coredns service (${green}default${normal})."
     fi
-    echo "${yellow}hevsocks${normal}    \t• Hev Socks5 Tunnel operation (${red}workaround only${normal})" $( $expand || echo "{${yellow}start|restart|stop|enable|disable${normal}}" ) && [ -z $all ] || description "This workaround only for old/unsupported device which can only use mode userspace-networking only, in this mode tailscaled tun mode changed to userspace-networking while enabled, if disabled revert back tun mode to tailscale0, if you want run in subnet routes mode, please edit setting file to include your subnet and restart the hevsocks service."
+    echo "${yellow}hevsocks${normal}    \t• Hev Socks5 Tunnel operation (${red}workaround only${normal})" $( $expand || echo "{${yellow}start|restart|stop|enable|disable${normal}}" ) && [ -z $all ] || description "This workaround only for old/unsupported device which can use mode userspace-networking only, in this mode tailscaled tun mode changed to userspace-networking while enabled, if disabled revert back tun mode to tailscale0, this mode will make all tcp connection to use socks5 tailscale, may unefficient for performance."
     if $expand; then
       echo "  ${yellow}↳${normal} ${orange}start${normal}   \t- Start hevsocks."
       echo "  ${yellow}↳${normal} ${orange}restart${normal} \t- Retart hevsocks."
