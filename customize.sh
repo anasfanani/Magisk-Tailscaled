@@ -126,7 +126,7 @@ else
     ui_print "- Read the README.md"
   else
     ui_print "- Tailscaled service manager :"
-    ui_print "  su -c '/dev/tailscaled.service'"
+    ui_print "  su -c 'tailscaled.service'"
   fi
 fi
 
