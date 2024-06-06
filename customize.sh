@@ -103,7 +103,6 @@ ${CUSTOM_SCRIPTS_DIR}/start.sh postinstall 2>&1 &
 if [ ! -f "/system/bin/tailscale" ] || ! cmp --silent "/system/bin/tailscale" "$CUSTOM_BIN_DIR/tailscale"; then
   ui_print "- Link file to /dev/."
   ln -sf "$CUSTOM_SCRIPTS_DIR/tailscaled.service" /dev/tailscaled.service
-  ln -sf "$MODPATH/system/bin/tailscaled" /dev/tailscaled
   ln -sf "$MODPATH/system/bin/tailscale" /dev/tailscale
   ui_print "-----------------------------------------------------------"
   ui_print " Instructions       "
