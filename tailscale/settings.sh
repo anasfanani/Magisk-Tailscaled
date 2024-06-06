@@ -44,7 +44,7 @@ tailscaled_runs_log="${tailscaled_run_dir}/runs.log"
 
 hevsocks_autostart=false;
 hevsocks_bin="${tailscale_dir}/bin/hevsocks"
-hevsocks_conf="${tailscaled_scripts_dir}/tmp/hevsocks.yaml"
+hevsocks_conf="${tailscale_dir}/tmp/hevsocks.yaml"
 hevsocks_log="${tailscaled_run_dir}/$(basename ${hevsocks_bin}.log)"
 hevsocks_ifname="hevsocks0"
 # This mode will route all tcp packet use socks5 server tailscale, may unefficient for performance
