@@ -1,5 +1,5 @@
 #!/system/bin/sh
-DIR=${0%/*}
+DIR=$(dirname $(realpath $0))
 source $DIR/../settings.sh
 
 events="$1"
