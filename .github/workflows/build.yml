@@ -71,6 +71,10 @@ jobs:
         mkdir -p dist/arm
         cd build/tailscale
 
+        # Patching etc/resolv.conf to readable dir
+        sed -i 's|/etc/resolv.conf|/data/adb/tailscaled/tmp/resolv.conf|g' net/dns/resolvconfpath_default.go
+        sed -i 's|/etc/resolv.pre-tailscale-backup.conf|/data/adb/tailscaled/tmp/resolv.pre-tailscale-backup.conf|g' net/dns/resolvconfpath_default.go
+
         # Generate Version Info
         eval `CGO_ENABLED=0 GOOS=$(go env GOHOSTOS) GOARCH=$(go env GOHOSTARCH) go run ./cmd/mkversion`
         ldflags="-X tailscale.com/version.longStamp=${VERSION_LONG} -X tailscale.com/version.shortStamp=${VERSION_SHORT}"
@@ -207,13 +211,15 @@ jobs:
         mkdir -p dist
 
         # zip all files
-        zip -9 -r "./dist/Magisk-Tailscaled-${versionString}.zip" . -x "*.git*" "dist/*" "*.zip" "*.json"
+        zip -9 -r "./dist/Magisk-Tailscaled-${versionString}.zip" . -x "*.git*" "dist/*" "*.zip" "*.json" "*.md"
 
         # zip all files for arm
-        zip -9 -r "./dist/Magisk-Tailscaled-arm-${versionString}.zip" . -x "*.git*" "dist/*" "*.zip" "*.json" "files/tailscale.combined-arm64" "files/hev-socks5-tunnel-linux-arm64"
+        zip -9 -r "./Magisk-Tailscaled-arm-${versionString}.zip" . -x "*.git*" "dist/*" "*.zip" "*.json" "files/*" "*.md"
+        zip -9 "./Magisk-Tailscaled-arm-${versionString}.zip" "files/tailscale.combined-arm"
 
         # zip all files for arm64
-        zip -9 -r "./dist/Magisk-Tailscaled-arm64-${versionString}.zip" . -x "*.git*" "dist/*" "*.zip" "*.json" "files/tailscale.combined-arm" "files/hev-socks5-tunnel-linux-arm"
+        zip -9 -r "./Magisk-Tailscaled-arm64-${versionString}.zip" . -x "*.git*" "dist/*" "*.zip" "*.json" "files/*" "*.md"
+        zip -9 "./Magisk-Tailscaled-arm64-${versionString}.zip" "files/tailscale.combined-arm64"
 
         cd ..
 
