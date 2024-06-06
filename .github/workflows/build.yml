@@ -214,12 +214,12 @@ jobs:
         zip -9 -r "./dist/Magisk-Tailscaled-${versionString}.zip" . -x "*.git*" "dist/*" "*.zip" "*.json" "*.md"
 
         # zip all files for arm
-        zip -9 -r "./Magisk-Tailscaled-arm-${versionString}.zip" . -x "*.git*" "dist/*" "*.zip" "*.json" "files/*" "*.md"
-        zip -9 "./Magisk-Tailscaled-arm-${versionString}.zip" "files/tailscale.combined-arm"
+        zip -9 -r "./dist/Magisk-Tailscaled-arm-${versionString}.zip" . -x "*.git*" "dist/*" "*.zip" "*.json" "files/*" "*.md"
+        zip -9 "./dist/Magisk-Tailscaled-arm-${versionString}.zip" "files/tailscale.combined-arm"
 
         # zip all files for arm64
-        zip -9 -r "./Magisk-Tailscaled-arm64-${versionString}.zip" . -x "*.git*" "dist/*" "*.zip" "*.json" "files/*" "*.md"
-        zip -9 "./Magisk-Tailscaled-arm64-${versionString}.zip" "files/tailscale.combined-arm64"
+        zip -9 -r "./dist/Magisk-Tailscaled-arm64-${versionString}.zip" . -x "*.git*" "dist/*" "*.zip" "*.json" "files/*" "*.md"
+        zip -9 "./dist/Magisk-Tailscaled-arm64-${versionString}.zip" "files/tailscale.combined-arm64"
 
         cd ..
 
