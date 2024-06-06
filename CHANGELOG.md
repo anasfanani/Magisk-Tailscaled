@@ -22,3 +22,9 @@
 - Recode old script
 
 Everything should works fine !
+
+Warn: small typo, if you want enable hevsocks, edit file settings.sh and change `hevsocks_conf` value with this `hevsocks_conf="${tailscale_dir}/tmp/hevsocks.yaml"`.
+
+I have to rest 😓
+
+**Full Changelog**: https://github.com/anasfanani/Magisk-Tailscaled/compare/v1.66.1.0...v1.66.4.0
