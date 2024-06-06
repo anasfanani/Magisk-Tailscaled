@@ -1,5 +1,5 @@
 #!/system/bin/sh
-source /data/adb/tailscale/settings.ini
+source /data/adb/tailscale/settings.sh
 if echo "$@" | grep -q -- '--socket='; then # if socket is specified, use it
     "${tailscale_bin}" "$@"
 else # otherwise, use the default socket

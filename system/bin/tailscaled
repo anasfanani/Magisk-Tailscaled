@@ -1,5 +1,5 @@
 #!/system/bin/sh
-source /data/adb/tailscale/settings.ini
+source /data/adb/tailscale/settings.sh
 if [ $# -eq 0 ]; then # if no arguments are passed, start tailscaled
     "${tailscaled_bin}" ${tailscaled_bin_param}
 else # otherwise, run tailscale with the arguments passed

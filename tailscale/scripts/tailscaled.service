@@ -1,6 +1,6 @@
 #!/system/bin/sh
 DIR=${0%/*}
-source $DIR/../settings.ini
+source $DIR/../settings.sh
 scripts_name=$(basename $0)
 
 
@@ -515,7 +515,7 @@ _log(){
       busybox tail -q -n +1 -F "${coredns_log}"
       ;;
     service)
-      busybox less -F~ "${tailscaled_service_log}"
+      busybox less -F~ "${tailscaled_runs_log}"
       ;;
     daemon)
       busybox tail -q -n +1 -F "${tailscaled_log}"
@@ -556,7 +556,7 @@ help(){
     echo "${green}Tailscaled Service Manager${normal}"
     echo "Manage and customizing how tailscaled runs on your Android."
     echo "${blue}Available Command:${normal}"
-    echo "${yellow}start${normal}       \t• Start tailscaled service" && [ -z $all ] || description "Read configuration file in ${tailscale_dir}/ and store output log to ${tailscaled_log} then write pid file to ${tailscaled_pid}."
+    echo "${yellow}start${normal}       \t• Start tailscaled service" && [ -z $all ] || description "Read configuration file in ${tailscale_dir}/ and store output log to ${tailscaled_log} then write pid file to ${tailscaled_run_dir}."
     echo "${yellow}stop${normal}        \t• Stop tailscaled service" && [ -z $all ] || description "Kill with signal 15, waiting to process doing self cleanup, if still running, then force kill."
     echo "${yellow}restart${normal}     \t• Restart tailscaled service" && [ -z $all ] || description "Kill, waiting, then start the process again, this command also rename file log to ${tailscaled_log}.bak, always have .bak from last running process."
     echo "${yellow}status${normal}      \t• Show current process status" && [ -z $all ] || description "Retreiving info from daemon, usefull for inspect current running process."

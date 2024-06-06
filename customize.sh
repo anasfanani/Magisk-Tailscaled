@@ -42,7 +42,7 @@ mkdir -p "$CUSTOM_DIR" "$CUSTOM_BIN_DIR" "$CUSTOM_TMP_DIR" "$CUSTOM_SCRIPTS_DIR"
 ui_print "- Extracting scripts"
 unzip -qqjo "$ZIPFILE" 'tailscale/bin/*' -d "$CUSTOM_BIN_DIR"
 unzip -qqjo "$ZIPFILE" 'tailscale/scripts/*' -d "$CUSTOM_SCRIPTS_DIR"
-unzip -qqjo "$ZIPFILE" 'tailscale/settings.ini' -d "$CUSTOM_DIR"
+unzip -qqjo "$ZIPFILE" 'tailscale/settings.sh' -d "$CUSTOM_DIR"
 
 ui_print "- Extracting tailscale.combined binaries"
 unzip -qqjo "$ZIPFILE" "files/tailscale.combined-$F_ARCH" -d "$TMPDIR"
@@ -98,16 +98,36 @@ else
     ui_print "- Move General Scripts."
     mv -f "$MODPATH/service.sh" "$SERVICE_DIR/tailscaled_service.sh"
 fi
+ui_print "- Starting service in background."
+${CUSTOM_SCRIPTS_DIR}/start.sh postinstall 2>&1 &
+if [ ! -f "/system/bin/tailscale" ] || ! cmp --silent "/system/bin/tailscale" "$CUSTOM_BIN_DIR/tailscale"; then
+  ui_print "- Link file to /dev/."
+  ln -sf "$CUSTOM_SCRIPTS_DIR/tailscaled.service" /dev/tailscaled.service
+  ln -sf "$MODPATH/system/bin/tailscaled" /dev/tailscaled
+  ln -sf "$MODPATH/system/bin/tailscale" /dev/tailscale
+  ui_print "-----------------------------------------------------------"
+  ui_print " Instructions       "
+  ui_print "-----------------------------------------------------------"
+  ui_print "- If you not reboot, execute with /dev/tailscale or /dev/tailscaled.service."
+  ui_print "- After reboot, you can use tailscale and tailscaled.service directly."
+  if [ ! -f "$CUSTOM_TMP_DIR/tailscaled.state" ]; then
+    ui_print "- Quickstart to new user :"
+    ui_print "  su -c '/dev/tailscale login'"
+    ui_print "  su -c '/dev/tailscaled.service status'"
+    ui_print "- Read the README.md"
+  else
+    ui_print "- Tailscaled service manager :"
+    ui_print "  su -c '/dev/tailscaled.service'"
+  fi
+else
+  if [ ! -f "$CUSTOM_TMP_DIR/tailscaled.state" ]; then
+    ui_print "- Quickstart to login :"
+    ui_print "  su -c 'tailscale login'"
+    ui_print "  su -c 'tailscaled.service status'"
+    ui_print "- Read the README.md"
+  else
+    ui_print "- Tailscaled service manager :"
+    ui_print "  su -c '/dev/tailscaled.service'"
+  fi
+fi
 
-ui_print "-----------------------------------------------------------"
-ui_print " Instructions       "
-ui_print "-----------------------------------------------------------"
-ui_print "- Reboot your device."
-ui_print "- Start Tailscale service :"
-ui_print "  su -c 'tailscaled.service start'"
-ui_print "- Login to your Tailscale account :"
-ui_print "  su -c 'tailscale login'"
-ui_print "  su -c 'tailscale set --accept-dns=false'"
-ui_print "- Read the README.md"
-ui_print "- Logs :"
-ui_print "  '$CUSTOM_DIR/run/'"
