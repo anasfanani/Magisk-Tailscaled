@@ -211,11 +211,13 @@ status_tailscaled(){
           }
           /^#/ {
               sub(/^# /, "");
-              if (substr($0, 0, 4) == "    ") {
-                  sub(/^    - /, "");
-                  comments_body = comments_body $0 "\n";
+              if (substr($0, 0, 4) == "    " && $0 != "") {
+                sub(/^    - /, "");
+                comments_body = comments_body $0 "\n";
               } else {
-                  comments_header = comments_header $0 "\n";
+                if ($0 != "") {
+                  comments_header = comments_header " " $0;
+                }
               }
               next;
           }
@@ -249,8 +251,13 @@ status_tailscaled(){
                   }
               }
               if(comments_header != "" ){
-                printf "  ↳ %s", comments_header;
-                printf "\t  ↳ \t\t\t%s", yellow comments_body normal;
+                num_comment = split(comments_body, comments_array, "\n");
+                printf "  ↳ %s (%s)\n", comments_header, blue num_comment normal;
+                for (i = 1; i <= num_comment; i++) {
+                  if (comments_array[i] != "") {
+                    printf "\t  ↳ \t\t\t%s\n", yellow comments_array[i] normal;
+                  }
+                }
               }
           }'
 
