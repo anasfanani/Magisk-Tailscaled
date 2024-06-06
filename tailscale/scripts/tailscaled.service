@@ -3,144 +3,632 @@ DIR=${0%/*}
 source $DIR/../settings.ini
 scripts_name=$(basename $0)
 
-start_tailscaled() {
-  sed -Ei "s/^description=(\[.*][[:space:]]*)?/description=[ ⏲ $current_time | ✔ tailscaled service is running!!! ] /g" "$module_prop"
-  PID=$(busybox pgrep "${tailscaled_bin}")
-  if [ -n "$PID" ]; then
-    PID_INFO=$(ps -p $PID -o pid,stime,cmd | grep $PID)
-    log Info "✔ tailscaled service already running with PID : ( $PID )."
-    read pid stime cmd <<< "$PID_INFO"
-    log Info "Start time: $stime"
-    return
-  fi
-  # The logs time cannot set to current timezone, default is UTC.
-  [ -f "${tailscaled_log}" ] && mv "${tailscaled_log}" "${tailscaled_log}.bak"; # for debugging
-  nohup ${tailscaled_bin} ${tailscaled_bin_param} > "${tailscaled_log}" 2>&1 &
-  PID=$!
-  
-  # Fetch process information
-  PID_INFO=$(ps -p $PID -o pid,stime,cmd | grep $PID)
 
-  # Check if we found the process
-  if [ -n "$PID_INFO" ]; then
-      # Read the fetched information into variables
-      read pid stime cmd <<< "$PID_INFO"
-      # Output detailed information
-      log Info "✔ tailscaled service running with PID : ( $PID )."
-      log Info "Start time: $stime"
-      log Info "Command: $cmd"
-      echo -n $PID > "${tailscaled_pid}"
-  else
+
+
+program(){
+  ## hehe
+
+  # bin_file
+  # logdir
+  # command
+  # pre_up
+  # pre_down
+  # post_up
+  # post_down
+
+  log "bin_file ${bin_file}"
+  log "logdir ${logdir}"
+  log "command ${command}"
+  log "pre_up ${pre_up}"
+  log "pre_down ${pre_down}"
+  log "post_up ${post_up}"
+  log "post_down ${post_down}"
+
+  bin_name=$(basename ${bin_file});
+  log_file="${logdir}/${bin_name}.log"
+  pid_file="${logdir}/${bin_name}.pid"
+  check(){
+    PID=$(busybox pgrep "${bin_file}")
+    if [ -n "$PID" ]; then
+      log Info "✔ ${bin_name} service is running with PID: ${PID}."
+      return 1
+    fi
+  }
+  start(){
+    log Info "Starting ${bin_name} service."
+    check
+    if [ $? -ne 0 ]; then return 0; fi
+    if ! [ -f "${bin_file}" ]; then log Error "file not found: ${bin_file}"; return 1; fi
+    [ -f "${log_file}" ] && mv "${log_file}" "${log_file}.bak" # log for old output
+    if [ ! -z "${pre_up}" ];then $pre_up  2>&1; fi
+    nohup ${command}> "${logdir}/${bin_name}.log" 2>&1 &
+    PID=$!
+    log "Command: ${command}"
+    sleep 3 # waiting for program really started
+    PID_INFO=$(ps -p $PID -o pid,stime | grep $PID)
+    if [ -n "$PID_INFO" ]; then
+      read pid stime <<< "$PID_INFO"
+      log Info "✔ ${bin_name} service success running with PID: ${PID}, Start time: $stime."
+      echo -n $PID > "${pid_file}"
+      if [ ! -z "${post_up}" ];then ${post_up} 2>&1; fi
+      return 0
+    else
       log Error "No process with PID $PID found."
-      [ -f "${tailscaled_log}" ] && { log Error "Check ${tailscaled_log} for more information !"; } || { log Error "No output from command, please start manual with this command and see the response."; log Info "HOME=/data/adb/tailscale/tmp ${tailscaled_bin} ${tailscaled_bin_param}"; }
-  fi
-  
-}
-stop_tailscaled(){
-  sed -Ei "s/^description=(\[.*][[:space:]]*)?/description=[ ⏲ $current_time | ✘ tailscaled shutting down, service is stopped !!! ] /g" "$module_prop"
-  # Check if the binary is running using pgrep
-  if busybox pgrep "${tailscaled_bin}" >/dev/null; then
-    # Use `busybox pkill` to kill the binary with signal 15, otherwise use `killall`.
-    if busybox pkill -15 -e "${tailscaled_bin}" >/dev/null 2>&1; then
-      : # Do nothing if busybox pkill is successful
-    else
-      killall -15 "${tailscaled_bin}" >/dev/null 2>&1 || kill -15 "$(busybox pgrep "${tailscaled_bin}")" >/dev/null 2>&1
+      [ -f "${log_file}" ] && { log Error "Check ${log_file} for more information !"; } || { log Error "No output from command, please start manual the program."; }
+      return 1
     fi
-  else
-    log Info "✘ tailscaled service already stop."
-    rm -f "${tailscaled_pid}"
-    [ -t 1 ] && echo -e "${white}--------------------------------------------${normal}"
-    return
-  fi
-  # Check if the binary has stopped
-  sleep 0.5
-  if ! busybox pgrep "${tailscaled_bin}" >/dev/null 2>&1; then
-    # Delete the `tailscaled.pid` file if it exists
-    rm -f "${tailscaled_pid}"
-    log Info "✘ tailscaled shutting down, service is stopped."
-    log Info "✘ tailscaled disconnected."
-    [ -t 1 ] && echo -e "${white}--------------------------------------------${normal}"
-  else
-    log Warning "⚠️ tailscaled Not stopped; may still be shutting down or failed to shut down."
-    force_stop
-  fi
-
-  
-}
-force_stop() {
-  # try forcing it to shut down.
-  log Warning "⚠️ try forcing it to shut down."
-  # Use `busybox pkill` to kill the binary with signal 9, otherwise use `killall`.
-  if busybox pkill -9 "${tailscaled_bin}"; then
-    : # Do nothing if busybox pkill is successful
-  else
-    if command -v killall >/dev/null 2>&1; then
-      killall -9 "${tailscaled_bin}" >/dev/null 2>&1 || true
+  }
+  stop(){
+    log Info "Stopping ${bin_name} service."
+    if busybox pgrep "${bin_file}" >/dev/null; then
+      if [ ! -z "${pre_down}" ];then $pre_down  2>&1; fi
+      # Use `busybox pkill` to kill the binary with signal 15, otherwise use `killall`.
+      if busybox pkill -15 -e "${bin_file}" >/dev/null 2>&1; then
+        : # Do nothing if busybox pkill is successful
+      else
+        killall -15 "${bin_file}" >/dev/null 2>&1 || kill -15 "$(busybox pgrep "${bin_file}")" >/dev/null 2>&1
+      fi
     else
-      pkill -9 "${tailscaled_bin}" >/dev/null 2>&1 || true
+      log Info "✘ ${bin_name} service is not running."
+      [ -t 1 ] && echo -e "${white}--------------------------------------------${normal}"
+      return 0
     fi
-  fi
-  sleep 0.5
-  if ! busybox pgrep "${tailscaled_bin}" >/dev/null 2>&1; then
-    log Info "✔ done, you can sleep peacefully."
-    [ -t 1 ] && echo -e "${white}--------------------------------------------${normal}"
-    rm -f "${tailscaled_pid}"
-  fi
+    sleep 3 # wait the binary has stopped properly
+    if ! busybox pgrep "${bin_file}" >/dev/null 2>&1; then
+      log Info "✘ ${bin_name} shutting down, service is stopped."
+      log Info "✘ ${bin_name} disconnected."
+      if [ ! -z "${post_down}" ];then $post_down  2>&1; fi
+      [ -t 1 ] && echo -e "${white}--------------------------------------------${normal}"
+      return 0
+    else
+      log Warning "⚠️ ${bin_name} Not stopped; may still be shutting down or failed to shut down."
+      # try forcing it to shut down.
+      log Warning "⚠️ try forcing it to shut down."
+      # Use `busybox pkill` to kill the binary with signal 9, otherwise use `killall`.
+      if busybox pkill -9 "${bin_file}"; then
+        : # Do nothing if busybox pkill is successful
+      else
+        if command -v killall >/dev/null 2>&1; then
+          killall -9 "${bin_file}" >/dev/null 2>&1 || true
+        else
+          pkill -9 "${bin_file}" >/dev/null 2>&1 || true
+        fi
+      fi
+      sleep 2
+      if ! busybox pgrep "${bin_file}" >/dev/null 2>&1; then
+        log Info "✔ done, you can sleep peacefully."
+        if [ ! -z "${post_down}" ];then post_down  2>&1; fi
+        [ -t 1 ] && echo -e "${white}--------------------------------------------${normal}"
+        return 0
+      fi
+    fi
+  }
+  restart(){
+    log Info "Restarting ${bin_name} service."
+    program stop 
+    sleep 0.5
+    program start
+  }
+  
+  $1
 }
 
-status_tailscaled(){
-  PID=$(busybox pgrep "${tailscaled_bin}")
-  if [ -n "$PID" ]; then
-    log Info "✔ tailscaled service is running with PID : ( $PID )."
-    log Info "Start command: ${tailscaled_bin} ${tailscaled_bin_param}"
-    log Info "Logs dir: ${tailscaled_run_dir}"
-    return
-  else
-    log Info "✘ tailscaled service is stopped."
-  fi
-}
-log_view(){
+_tailscaled(){
+  bin_file="${tailscaled_bin}"
+  logdir="${tailscale_dir}/run"
+  command="${tailscaled_bin} ${tailscaled_bin_param}"
+  command="busybox setuidgid "root:net_bt_admin" ${tailscaled_bin} ${tailscaled_bin_param}"
+  tailscaled_up(){
+    sed -Ei "s/^description=(\[.*][[:space:]]*)?/description=[ ⏲ $current_time | ✔ tailscaled service is running!!! ] /g" "$module_prop"
+    if $coredns_autostart; then
+      log Info "Autostart coredns";
+      $tailscaled_service coredns start
+    fi
+    if $hevsocks_autostart; then
+      log Info "Autostart hevsocks";
+      $tailscaled_service hevsocks start
+    fi
+  }
+  tailscaled_down(){
+    sed -Ei "s/^description=(\[.*][[:space:]]*)?/description=[ ⏲ $current_time | ✘ tailscaled shutting down, service is stopped !!! ] /g" "$module_prop"
+    if $coredns_autostart; then
+      log Info "Autostop coredns";
+      $tailscaled_service coredns stop;
+    fi
+    if $hevsocks_autostart; then
+      log Info "Autostop hevsocks";
+      $tailscaled_service hevsocks stop;
+    fi
+  }
+  pre_up=""
+  pre_down=""
+  post_up="tailscaled_up"
+  post_down="tailscaled_down"
   case "$1" in
-    runs)
-      busybox less -F~ "${tailscaled_runs_log}"
+    status)
+      program check
+    ;;
+    start)
+      program check
+      if [ $? -ne 0 ]; then return; fi
+      program start
+      if [ $? -ne 0 ]; then
+        log $?
+        log Warning "Got unfriendly response after start tailscaled !"
+        return 1
+      fi
+    ;;
+    restart)
+      log Info "Stopping !"
+      $tailscaled_service stop
+      log Info "Stop success !"
+      sleep 1
+      log Info "Restarting !"
+      $tailscaled_service start
+      log Info "Restart success !"
+    ;;
+    stop)
+      program stop
+      if [ $? -ne 0 ]; then
+        log Error "Got unfriendly response after stop tailscaled !"
+        return 1
+      fi
+    ;;
+  esac
+}
+status_tailscaled(){
+  echo "${blue}Service Status Info${normal}"
+  $(_tailscaled status) && tailscaled_run=false || tailscaled_run=true
+  echo -ne "${yellow}tailscale${normal}\t\t\t"
+  if $tailscaled_run; then
+      echo "${green}running${normal}"
+      echo "  ↳ tun   \t\t\t${yellow}${tailscaled_tun_mode}${normal}"
+      echo "  ↳ socks \t\t\t${yellow}${tailscaled_socks}${normal}"
+      echo "  ↳ proxy \t\t\t${yellow}${tailscaled_proxy}${normal}"
+      tailscale_ip=$(tailscale ip 2>&1)
+      if [ $? -ne 0 ]; then
+        if echo "$tailscale_ip" | grep -q 'NeedsLogin'; then
+          echo "  ↳ ipv4  \t\t\t${red}need login${normal}"
+        else
+          echo "  ↳ ipv4  \t\t\t${red}error${normal}"
+        fi
+      else
+        ipv4=$(echo "$tailscale_ip" | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
+        ipv6=$(echo "$tailscale_ip" | grep -oE '^[a-fA-F0-9:]+$')
+        echo "  ↳ ipv4  \t\t\t${yellow}${ipv4}${normal}"
+        echo "  ↳ ipv6  \t\t\t${yellow}${ipv6}${normal}"
+        tailscale status | awk -v blue="$blue" -v green="$green" -v red="$red" -v orange="$orange" -v yellow="$yellow" -v normal="$normal" '
+          BEGIN {
+              printf "  ↳ tailscale status\n";
+          }
+          /offline/ {
+              offline_peers = offline_peers $0 "\n";
+              next;
+          }
+          /^#/ {
+              sub(/^# /, "");
+              if (substr($0, 0, 4) == "    ") {
+                  sub(/^    - /, "");
+                  comments_body = comments_body $0 "\n";
+              } else {
+                  comments_header = comments_header $0 "\n";
+              }
+              next;
+          }
+          {
+              online_peers = online_peers $0 "\n";
+          }
+          END {
+              num_online_peers = split(online_peers, online_array, "\n");
+              printf "  ↳ Online (%s)\n", green num_online_peers normal;
+              for (i = 1; i <= num_online_peers; i++) {
+                  if (online_array[i] != "") {
+                      split(online_array[i], fields, " ");
+                      extra_fields = ""
+                      for (j = 5; j <= length(fields); j++) extra_fields = extra_fields " " fields[j]
+                      printf "\t  ↳ %s\t%s %s %s %s\n", green fields[1], orange fields[4], yellow fields[2], orange fields[3], yellow extra_fields normal
+
+                  }
+              }
+              if (offline_peers == "") {
+                  printf "  ↳ Offline (%s)\n", green "0" normal;
+              } else {
+                  num_offline_peers = split(offline_peers, offline_array, "\n");
+                  printf "  ↳ Offline (%s)\n", red num_offline_peers normal;
+                  for (i = 1; i <= num_offline_peers; i++) {
+                      if (offline_array[i] != "") {
+                          split(offline_array[i], fields, " ");
+                          extra_fields = ""
+                          for (j = 5; j <= length(fields); j++) extra_fields = extra_fields " " fields[j]
+                          printf "\t  ↳ %s\t%s %s %s %s\n", red fields[1], orange fields[4], yellow fields[2], orange fields[3], yellow extra_fields normal
+                      }
+                  }
+              }
+              if(comments_header != "" ){
+                printf "  ↳ %s", comments_header;
+                printf "\t  ↳ \t\t\t%s", yellow comments_body normal;
+              }
+          }'
+
+
+      fi
+  else
+      echo "${red}stopped${normal}"
+  fi
+  $(_coredns status) && coredns_status=false || coredns_status=true
+  echo -ne "${yellow}coredns${normal}  \t\t\t"
+  if $coredns_status; then
+    echo "${green}running${normal}"
+    echo "  ↳ port   \t\t\t${yellow}${coredns_port}${normal}"
+  else
+    echo "${red}stopped${normal}"
+  fi
+  $(_hevsocks status) && hevsocks_status=false || hevsocks_status=true
+  echo -ne "${yellow}hevsocks${normal}  \t\t\t"
+  if $hevsocks_status; then
+    echo "${green}running${normal}"
+    echo "  ↳ interface \t\t\t${yellow}${hevsocks_ifname}${normal}"
+    # echo -ne "  ↳ route \t\t\t${yellow}$(IFS=,; echo "${hevsocks_tailnet[*]}")${normal}\n"
+  else
+    echo "${red}stopped${normal}"
+  fi
+}
+_coredns(){
+  export bin_file="${coredns_bin}"
+  export logdir="${tailscale_dir}/run"
+  export command="busybox setuidgid "root:net_bt_admin" ${coredns_bin} -conf ${coredns_conf}"
+  pre_up=""
+  pre_down="coredns_pre_down"
+  post_up="coredns_post_up"
+  post_down=""
+  check_bin(){
+    if ! [ -f "${coredns_bin}" ]; then
+      log Info "Downloading Coredns.."
+      arch=$(case "$(uname -m)" in aarch64|arm64) echo "arm64" ;; *) echo "arm" ;; esac)
+      busybox wget --no-check-certificate "https://mirror.ghproxy.com/https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/coredns-${arch}" -O "${coredns_bin}"
+      if ! [ -f "${coredns_bin}" ]; then
+        log Error "Download error, manual download coredns from https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/coredns-${arch} and extract to ${coredns_bin}"
+        return;
+      fi
+      chown root:net_bt_admin ${coredns_bin}
+      chmod +x ${coredns_bin}
+    fi
+    if ! [ -f "${coredns_conf}" ];then
+      log Info "Downloading default config.."
+      busybox wget --no-check-certificate "https://mirror.ghproxy.com/https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/Corefile" -O "${coredns_conf}"
+      if ! [ -f "${coredns_conf}" ]; then
+        log Error "Download error, manual download Corefile from https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/Corefile and extract to ${coredns_conf}"
+        return;
+      fi
+      log Info "config is located at ${coredns_conf}, you need take a look at the file and change it if needed, and restart the service after edit config"
+    fi
+  }
+  check_bin
+  case "$1" in
+    status)
+      program check
+    ;;
+    start)
+      program check
+      if [ $? -ne 0 ]; then return; fi
+      if [ $tailscaled_tun_mode = "userspace-networking" ];then
+        log Error "Current tun mode ${tailscaled_tun_mode} is not supported to use coredns, please disable hevsocks or change manually the setting";
+        exit 1
+      fi
+      PID=$(busybox pgrep "${bin_file}")
+      if [ ! -e "${tailscaled_socket}" ]; then
+        ${tailscaled_service} start
+      fi
+      tailscale_ip=$(tailscale ip 2>&1)
+      if [ $? -ne 0 ]; then
+          if echo "$tailscale_ip" | grep -q 'NeedsLogin'; then
+            log Warning "You need to login first !"
+            tailscale login
+            ${tailscaled_service} coredns start
+            return
+          elif echo "$tailscale_ip" | grep -q 'NoState'; then
+            log Warning "Not connected to tailscale, sleeping 4 second, please wait !"
+            sleep 4
+            _coredns start
+            return
+          else
+            log Error "Unknown error response: ${tailscale_ip}."
+            return
+          fi
+          return
+      fi
+      ipv4=$(echo "$tailscale_ip" | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
+      ipv6=$(echo "$tailscale_ip" | grep -oE '^[a-fA-F0-9:]+$')
+      log Info "IPv4: $ipv4"
+      log Info "IPv6: $ipv6"
+      program start
+      if [ $? -ne 0 ]; then
+        log Error "Got unfriendly response after start coredns !"
+        return 1
+      fi
+    ;;
+    restart)
+      $tailscaled_service coredns stop
+      sleep 0.5
+      $tailscaled_service coredns start
+    ;;
+    stop)
+      program stop
+      if [ $? -ne 0 ]; then
+        log Error "Got unfriendly response after stop coredns !"
+        return 1
+      fi
+    ;;
+    enable)
+      log Info "Change setting to enable coredns autostart"
+      sed -i 's/coredns_autostart=.*;/coredns_autostart=true;/' "$setting_file"
+      $tailscaled_service coredns start
+    ;;
+    disable)
+      log Info "Change setting to disable coredns autostart"
+      sed -i 's/coredns_autostart=.*;/coredns_autostart=false;/' "$setting_file"
+      $tailscaled_service coredns stop
+    ;;
+    *)
+      if [ -n "$1" ]; then
+        echo "${yellow}${scripts_name} ${yellow}coredns ${orange}$1 - ${normal}${red}Error: ${normal}command not found."
+        return
+      fi
+      echo "${yellow}usage${normal}: ${green}${scripts_name}${normal} ${yellow}coredns${normal} {${orange}start|restart|stop|enable|disable${normal}}"
+    ;;
+  esac
+}
+_hevsocks(){
+  bin_file="${hevsocks_bin}"
+  logdir="${tailscale_dir}/run"
+  command="${hevsocks_bin} ${hevsocks_conf}"
+  pre_up=""
+  pre_down="hevsocks_down"
+  post_up="hevsocks_up"
+  post_down=""
+  check_bin(){
+    if ! [ -f "${bin_file}" ]; then
+      log Info "Downloading Hevsocks.."
+      arch=$(case "$(uname -m)" in aarch64|arm64) echo "arm64" ;; *) echo "arm" ;; esac)
+      busybox wget --no-check-certificate "https://mirror.ghproxy.com/https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/hevsocks-${arch}" -O "${hevsocks_bin}"
+      if ! [ -f "${hevsocks_bin}" ]; then
+        log Error "Download error, manual download hevsocks from https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/hevsocks-${arch} and extract to ${hevsocks_bin}"
+        return;
+      fi
+      chown root:net_bt_admin ${bin_file}
+      chmod +x ${bin_file}
+    fi
+    if ! [ -f "${hevsocks_conf}" ];then
+      log Info "Downloading default config.."
+      busybox wget --no-check-certificate "https://mirror.ghproxy.com/https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/hevsocks.yaml" -O "${hevsocks_conf}"
+      if ! [ -f "${hevsocks_conf}" ]; then
+        log Error "Download error, manual download config from https://github.com/anasfanani/Magisk-Tailscaled/raw/main/files/hevsocks.yaml and extract to ${hevsocks_conf}"
+        return;
+      fi
+      log Info "config is located at ${hevsocks_conf}, you need take a look at the file and change it if needed, and restart service after edit config"
+    fi
+  }
+  check_bin
+  case "$1" in
+    status)
+      program check
+    ;;
+    start)
+      program check
+      if [ $? -ne 0 ]; then return; fi
+      if [ $tailscaled_tun_mode != "userspace-networking" ];then
+        log Warning "Current tun mode is ${tailscaled_tun_mode}, forced change tun mode to 'userspace-networking'";
+        tailscaled_tun_mode="userspace-networking";
+        sed -i 's/tailscaled_tun_mode=".*";/tailscaled_tun_mode="userspace-networking";/' "$setting_file"
+        _tailscaled restart
+        _hevsocks start
+        return
+      fi
+      PID=$(busybox pgrep "${coredns_bin}")
+      if [ -n "$PID" ]; then
+        log Warning "Stopping coredns while using socks!"
+        $tailscaled_service coredns stop
+      fi
+      PID=$(busybox pgrep "${bin_file}")
+      if [ ! -e "${tailscaled_socket}" ]; then
+        $tailscaled_service start
+        $tailscaled_service hevsocks start
+        return 
+      fi
+      tailscale_ip=$(tailscale ip 2>&1)
+      if [ $? -ne 0 ]; then
+          if echo "$tailscale_ip" | grep -q 'NeedsLogin'; then
+            log Warning "You need to login first !"
+            tailscale login
+            $tailscaled_service hevsocks start
+            return
+          elif echo "$tailscale_ip" | grep -q 'NoState'; then
+            log Warning "Not connected to tailscale, sleeping 4 second, please wait !"
+            sleep 4
+            $tailscaled_service hevsocks start
+            return
+          else
+            log Error "Unknown error response: ${tailscale_ip}."
+            return
+          fi
+          return
+      fi
+      ipv4=$(echo "$tailscale_ip" | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
+      ipv6=$(echo "$tailscale_ip" | grep -oE '^[a-fA-F0-9:]+$')
+      log Info "IPv4: $ipv4"
+      log Info "IPv6: $ipv6"
+      sed -i "s/^\([[:space:]]*\)ipv4: .*/\1ipv4: $ipv4/" "${hevsocks_conf}"
+      sed -i "s/^\([[:space:]]*\)ipv6: .*/\1ipv6: $ipv6/" "${hevsocks_conf}"
+      sed -i "s/^\([[:space:]]*\)name: .*/\1name: $hevsocks_ifname/" "${hevsocks_conf}"
+      program start
+      if [ $? -ne 0 ]; then
+        log Error "Got unfriendly response after start hevsocks !"
+        return 1
+      fi
+    ;;
+    restart)
+      $tailscaled_service hevsocks stop
+      sleep 0.5
+      $tailscaled_service hevsocks start
+    ;;
+    stop)
+      program stop
+      if [ $? -ne 0 ]; then
+        log Error "Got unfriendly response after stop hevsocks !"
+        return 1
+      fi
+    ;;
+    enable)
+      log Info "Change setting to enable hevsocks tunnel"
+      sed -i 's/hevsocks_autostart=.*;/hevsocks_autostart=true;/' "$setting_file"
+      log Info "Change setting to tun mode userspace-networking"
+      sed -i 's/tailscaled_tun_mode=".*";/tailscaled_tun_mode="userspace-networking";/' "$setting_file"
+      $tailscaled_service restart 
+      $tailscaled_service hevsocks start
+    ;;
+    disable)
+      log Info "Change setting to disable hevsocks tunnel"
+      sed -i 's/hevsocks_autostart=.*;/hevsocks_autostart=false;/' "$setting_file"
+      log Info "Change setting to tun mode tailscale0"
+      sed -i 's/tailscaled_tun_mode=".*";/tailscaled_tun_mode="tailscale0";/' "$setting_file"
+      $tailscaled_service hevsocks stop
+      $tailscaled_service restart 
+    ;;
+    *)
+      if [ -n "$1" ]; then
+        echo "${yellow}${scripts_name} ${yellow}hevsocks ${orange}$1 - ${normal}${red}Error: ${normal}command not found."
+        return
+      fi
+      echo "${yellow}usage${normal}: ${green}${scripts_name}${normal} ${yellow}hevsocks${normal} {${orange}start|restart|stop|enable|disable${normal}}"
+    ;;
+  esac
+}
+_log(){
+  case "$1" in
+    hevsocks)
+      busybox less -F~ "${hevsocks_log}"
+      ;;
+    dns)
+      busybox tail -q -n +1 -F "${coredns_log}"
       ;;
     service)
       busybox less -F~ "${tailscaled_service_log}"
       ;;
-    tailscaled)
+    daemon)
       busybox tail -q -n +1 -F "${tailscaled_log}"
       ;;
     *)
       if [ -n "$1" ]; then
-        echo "${red}${scripts_name} log $1 not found${normal}"
+        echo "${yellow}${scripts_name} ${yellow}log ${orange}$1 - ${normal}${red}Error: ${normal}command not found."
+        return
       fi
-      echo "${yellow}usage${normal}: ${green}${scripts_name}${normal} ${yellow}log${normal} {${orange}runs|service|tailscaled${normal}}"
+      echo "${yellow}usage${normal}: ${green}${scripts_name}${normal} ${yellow}log${normal} {${orange}daemon|service|dns|hevsocks${normal}}"
       ;;
   esac
   
 }
+_troubleshoot(){
+  echo "${red}Not yet ready!${normal}";
+  echo "${orange}Solution: ${yellow}Join telegram group at: [ ${green}https://t.me/systembinsh/158${normal} ${yellow}]${normal}";
+}
+help(){
+    if [ "$1" = "default" ]; then
+      expand=false
+    elif [ "$1" = "all" ]; then
+      expand=true
+      all=true
+    elif [ -z "$1" ];then
+      expand=true
+    else
+      echo "${yellow}${scripts_name} ${yellow}help ${orange}$1 - ${normal}${red}Error: ${normal}command not found."
+      return
+    fi
+    description() {
+      local w=0
+      busybox fold -sw70 <<< "$1" | while IFS= read -r line; do
+        [ $w = 1 ] && printf "  ${yellow}↨${normal}\t\t  %s\n" "$line"
+        [ $w = 0 ] && printf "  ${yellow}↨${normal}\t\t%s\n" "↳ $line"; w=1;
+      done
+    }
+    echo "${green}Tailscaled Service Manager${normal}"
+    echo "Manage and customizing how tailscaled runs on your Android."
+    echo "${blue}Available Command:${normal}"
+    echo "${yellow}start${normal}       \t• Start tailscaled service" && [ -z $all ] || description "Read configuration file in ${tailscale_dir}/ and store output log to ${tailscaled_log} then write pid file to ${tailscaled_pid}."
+    echo "${yellow}stop${normal}        \t• Stop tailscaled service" && [ -z $all ] || description "Kill with signal 15, waiting to process doing self cleanup, if still running, then force kill."
+    echo "${yellow}restart${normal}     \t• Restart tailscaled service" && [ -z $all ] || description "Kill, waiting, then start the process again, this command also rename file log to ${tailscaled_log}.bak, always have .bak from last running process."
+    echo "${yellow}status${normal}      \t• Show current process status" && [ -z $all ] || description "Retreiving info from daemon, usefull for inspect current running process."
+    echo "${yellow}log${normal}         \t• Logging tools" $( $expand || echo "{${yellow}daemon|service|coredns|hevsocks${normal}}") && [ -z $all ] || description "View logs from tailscaled daemon, service operation, coredns, and hevsocks."
+    if $expand; then
+      echo "  ${yellow}↳${normal} ${orange}daemon${normal}   \t- Tailscaled daemon log."
+      echo "  ${yellow}↳${normal} ${orange}service${normal}  \t- Service operation log."
+      echo "  ${yellow}↳${normal} ${orange}dns${normal}      \t- Coredns log."
+      echo "  ${yellow}↳${normal} ${orange}hevsocks${normal} \t- Hev Socks5 Tunnel log."
+    fi
+    echo "${yellow}coredns${normal}     \t• Coredns operation (${blue}new implementation${normal})" $($expand || echo "{${yellow}start|restart|stop|enable|disable${normal}}" ) && [ -z $all ] || description "Hijack raw udp dns on port 53 and redirect to coredns, coredns will determine which dns server to use, filtering domain with prefix default tailscale MagicDNS (.ts.net) to use dns server tailscale, this feature not working while secure dns is activated, you can change still use secure dns by add your favorite dns to Corefile in ${coredns_conf}. and restart the Coredns service."
+    if $expand; then
+      echo "  ${yellow}↳${normal} ${orange}start${normal}   \t- Start Coredns."
+      echo "  ${yellow}↳${normal} ${orange}restart${normal} \t- Retart Coredns."
+      echo "  ${yellow}↳${normal} ${orange}stop${normal}    \t- Stop Coredns."
+      echo "  ${yellow}↳${normal} ${orange}enable${normal}  \t- Enable autorun Coredns service."
+      echo "  ${yellow}↳${normal} ${orange}disable${normal} \t- Disable autorun Coredns service (${green}default${normal})."
+    fi
+    echo "${yellow}hevsocks${normal}    \t• Hev Socks5 Tunnel operation (${red}workaround only${normal})" $( $expand || echo "{${yellow}start|restart|stop|enable|disable${normal}}" ) && [ -z $all ] || description "This workaround only for old/unsupported device which can only use mode userspace-networking only, in this mode tailscaled tun mode changed to userspace-networking while enabled, if disabled revert back tun mode to tailscale0, if you want run in subnet routes mode, please edit setting file to include your subnet and restart the hevsocks service."
+    if $expand; then
+      echo "  ${yellow}↳${normal} ${orange}start${normal}   \t- Start hevsocks."
+      echo "  ${yellow}↳${normal} ${orange}restart${normal} \t- Retart hevsocks."
+      echo "  ${yellow}↳${normal} ${orange}stop${normal}    \t- Stop hevsocks."
+      echo "  ${yellow}↳${normal} ${orange}enable${normal}  \t- Enable autorun hevsocks service."
+      echo "  ${yellow}↳${normal} ${orange}disable${normal} \t- Disable autorun hevsocks service (${green}default${normal})."
+    fi
+    echo "${yellow}troubleshoot${normal}\t• Troubleshooting tools" $( $expand || echo "{${yellow}tailscale|tailscaled|dns|headscale|tailnet|debug${normal}}" ) && [ -z $all ] || description "Check and fix common problem with tailscale, tailscaled, dns, headscale, tailnet, and generate debug logs."
+    if $expand; then
+      echo "  ${yellow}↳${normal} ${orange}tailscale${normal} \t- Can't connect to server."
+      echo "  ${yellow}↳${normal} ${orange}tailscaled${normal}\t- Daemon not running."
+      echo "  ${yellow}↳${normal} ${orange}dns${normal}       \t- MagicDNS not working."
+      echo "  ${yellow}↳${normal} ${orange}headscale${normal} \t- Authentication problem."
+      echo "  ${yellow}↳${normal} ${orange}tailnet${normal}   \t- Unable to access other device."
+      echo "  ${yellow}↳${normal} ${orange}debug${normal}     \t- Generate debug logs."
+    fi
+    echo "${yellow}help${normal}        \t• Print help message" $( $expand || echo "{${yellow}all|tg${normal}}" )
+    if $expand; then
+      echo "  ${yellow}↳${normal} ${orange}all${normal}       \t- Expand all help message."
+      echo "  ${yellow}↳${normal} ${orange}tg${normal}        \t- Get help at telegram community group."
+    fi
+}
 case "$1" in
   start)
-    start_tailscaled
+    _tailscaled start
     ;;
   stop)
-    stop_tailscaled
+    _tailscaled stop
     ;;
   restart)
-    stop_tailscaled
-    sleep 0.5
-    start_tailscaled
+    _tailscaled restart
     ;;
   status)
     status_tailscaled
     ;;
   log)
-    log_view $2
+    _log $2
+    ;;
+  coredns)
+    _coredns $2
+    ;;
+  hevsocks)
+    _hevsocks $2
+    ;;
+  troubleshoot)
+    _troubleshoot $2
+    ;;
+  help)
+    help $2 $3
     ;;
   *)
     if [ -n "$1" ]; then
-      echo "${red}${scripts_name} $1 not found${normal}"
+      echo "${yellow}${scripts_name} ${orange}$1 ${red}not found${normal}, run ${yellow}${scripts_name} ${orange}help${normal} for all command"
+      return
     fi
-    echo "${yellow}usage${normal}: ${green}${scripts_name}${normal} {${yellow}start|stop|restart|status|log${normal}{${orange}runs|service|tailscaled${normal}${yellow}}${normal}}"
+    help "default"
     ;;
 esac
