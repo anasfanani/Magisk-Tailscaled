@@ -187,7 +187,7 @@ status_tailscaled(){
       echo "  ↳ tun   \t\t\t${yellow}${tailscaled_tun_mode}${normal}"
       echo "  ↳ socks \t\t\t${yellow}${tailscaled_socks}${normal}"
       echo "  ↳ proxy \t\t\t${yellow}${tailscaled_proxy}${normal}"
-      tailscale_ip=$(tailscale ip 2>&1)
+      tailscale_ip=$($tailscale_bin $tailscale_bin_param ip 2>&1)
       if [ $? -ne 0 ]; then
         if echo "$tailscale_ip" | grep -q 'NeedsLogin'; then
           echo "  ↳ ipv4  \t\t\t${red}need login${normal}"
@@ -201,7 +201,7 @@ status_tailscaled(){
         ipv6=$(echo "$tailscale_ip" | grep -oE '^[a-fA-F0-9:]+$')
         echo "  ↳ ipv4  \t\t\t${yellow}${ipv4}${normal}"
         echo "  ↳ ipv6  \t\t\t${yellow}${ipv6}${normal}"
-        tailscale status | awk -v blue="$blue" -v green="$green" -v red="$red" -v orange="$orange" -v yellow="$yellow" -v normal="$normal" '
+        $tailscale_bin $tailscale_bin_param status | awk -v blue="$blue" -v green="$green" -v red="$red" -v orange="$orange" -v yellow="$yellow" -v normal="$normal" '
           BEGIN {
               printf "  ↳ tailscale status\n";
           }
@@ -323,11 +323,11 @@ _coredns(){
       if [ ! -e "${tailscaled_socket}" ]; then
         ${tailscaled_service} start
       fi
-      tailscale_ip=$(tailscale ip 2>&1)
+      tailscale_ip=$($tailscale_bin $tailscale_bin_param ip 2>&1)
       if [ $? -ne 0 ]; then
           if echo "$tailscale_ip" | grep -q 'NeedsLogin'; then
             log Warning "You need to login first !"
-            tailscale login
+            $tailscale_bin $tailscale_bin_param login
             ${tailscaled_service} coredns start
             return
           elif echo "$tailscale_ip" | grep -q 'NoState'; then
@@ -439,11 +439,11 @@ _hevsocks(){
         $tailscaled_service hevsocks start
         return 
       fi
-      tailscale_ip=$(tailscale ip 2>&1)
+      tailscale_ip=$($tailscale_bin $tailscale_bin_param ip 2>&1)
       if [ $? -ne 0 ]; then
           if echo "$tailscale_ip" | grep -q 'NeedsLogin'; then
             log Warning "You need to login first !"
-            tailscale login
+            $tailscale_bin $tailscale_bin_param login
             $tailscaled_service hevsocks start
             return
           elif echo "$tailscale_ip" | grep -q 'NoState'; then
