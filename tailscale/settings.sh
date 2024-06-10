@@ -79,7 +79,7 @@ coredns_pid="${tailscaled_run_dir}/$(basename ${coredns_bin}.pid)"
 coredns_post_up(){
   iptables -w 10 -t nat -N DNS_LOCAL
   iptables -w 10 -t nat -F DNS_LOCAL
-  iptables -w 10 -t nat -I DNS_LOCAL -m owner --uid-owner "root" --gid-owner "net_admin" -j RETURN
+  iptables -w 10 -t nat -I DNS_LOCAL -m owner --uid-owner "root" --gid-owner "net_bt_admin" -j RETURN
   iptables -w 10 -t nat -A DNS_LOCAL -p udp --dport 53 ! -s 100.64.0.0/10 ! -d 100.100.100.100 -j DNAT --to-destination 127.0.0.1:1953
   iptables -w 10 -t nat -I OUTPUT -j DNS_LOCAL
 }
