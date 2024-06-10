@@ -6,6 +6,7 @@ case "$1" in
       rm -rf $tailscaled_run_dir
       mkdir -p $tailscaled_run_dir
       touch "${tailscale_dir}/tmp/resolv.conf"
+      chown -R root:net_bt_admin "${tailscale_dir}/bin/"
       $tailscaled_service restart >> "/dev/null" 2>&1 &
       return 0
     ;;
