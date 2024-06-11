@@ -1,3 +1,9 @@
+## v1.66.4.1
+- Fix permission & human typo.
+- Coredns works
+**Notice**
+No need update if you're not use coredns.
+
 ## v1.66.4.0
 - Update Tailscale binaries to v1.66.4
 - MagicDNS with coredns
@@ -20,11 +26,3 @@
 - Change settings.ini to settings.sh
 - Delete unused script
 - Recode old script
-
-Everything should works fine !
-
-Warn: small typo, if you want enable hevsocks, edit file settings.sh and change `hevsocks_conf` value with this `hevsocks_conf="${tailscale_dir}/tmp/hevsocks.yaml"`.
-
-I have to rest 😓
-
-**Full Changelog**: https://github.com/anasfanani/Magisk-Tailscaled/compare/v1.66.1.0...v1.66.4.0
