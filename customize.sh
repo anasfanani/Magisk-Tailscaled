@@ -44,15 +44,15 @@ unzip -qqjo "$ZIPFILE" 'tailscale/bin/*' -d "$CUSTOM_BIN_DIR"
 unzip -qqjo "$ZIPFILE" 'tailscale/scripts/*' -d "$CUSTOM_SCRIPTS_DIR"
 unzip -qqjo "$ZIPFILE" 'tailscale/settings.sh' -d "$CUSTOM_DIR"
 
-ui_print "- Extracting tailscale.combined binaries"
-unzip -qqjo "$ZIPFILE" "files/tailscale.combined-$F_ARCH" -d "$TMPDIR"
+ui_print "- Configuring files for $F_ARCH"
+unzip -qqjo "$ZIPFILE" "files/*" -d "$TMPDIR"
 mv -f "$TMPDIR/tailscale.combined-$F_ARCH" "$CUSTOM_BIN_DIR/tailscale.combined"
 ln -sf "$CUSTOM_BIN_DIR/tailscale.combined" "$CUSTOM_BIN_DIR/tailscale"
 ln -sf "$CUSTOM_BIN_DIR/tailscale.combined" "$CUSTOM_BIN_DIR/tailscaled"
-
-ui_print "- Extracting hev-socks5-tunnel binaries"
-unzip -qqjo "$ZIPFILE" "files/hev-socks5-tunnel-linux-$F_ARCH" -d "$TMPDIR"
-mv -f "$TMPDIR/hev-socks5-tunnel-linux-$F_ARCH" "$CUSTOM_BIN_DIR/socks5-tunnel"
+[ -f "$TMPDIR/coredns-$F_ARCH" ] && mv -f "$TMPDIR/coredns-$F_ARCH" "$CUSTOM_BIN_DIR/coredns"
+[ -f "$TMPDIR/Corefile" ] && mv -f "$TMPDIR/Corefile" "$CUSTOM_TMP_DIR/Corefile"
+[ -f "$TMPDIR/hevsocks-$F_ARCH" ] && mv -f "$TMPDIR/hevsocks-$F_ARCH" "$CUSTOM_BIN_DIR/hevsocks"
+[ -f "$TMPDIR/hevsocks.yaml" ] && mv -f "$TMPDIR/hevsocks.yaml" "$CUSTOM_TMP_DIR/hevsocks.yaml"
 
 ui_print "- Setting permissions"
 set_perm_recursive $CUSTOM_BIN_DIR 0 0 0755 0755
@@ -100,7 +100,7 @@ else
 fi
 ui_print "- Starting service in background."
 ${CUSTOM_SCRIPTS_DIR}/start.sh postinstall 2>&1 &
-if [ ! -f "/system/bin/tailscale" ] || ! cmp --silent "/system/bin/tailscale" "$CUSTOM_BIN_DIR/tailscale"; then
+if [ ! -f "/system/bin/tailscale" ] || ! cmp --silent "/system/bin/tailscale" "$MODPATH/system/bin/tailscale"; then
   ui_print "- Link file to /dev/."
   ln -sf "$CUSTOM_SCRIPTS_DIR/tailscaled.service" /dev/tailscaled.service
   ln -sf "$MODPATH/system/bin/tailscale" /dev/tailscale
@@ -129,4 +129,3 @@ else
     ui_print "  su -c 'tailscaled.service'"
   fi
 fi
-
