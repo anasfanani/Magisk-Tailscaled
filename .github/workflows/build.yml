@@ -149,16 +149,16 @@ jobs:
         sed -i "s/^versionCode=.*/versionCode=$newVersionCode/" module.prop
 
         # Estimate the zip url location
-        zipUrl="https://github.com/anasfanani/Magisk-Tailscaled/releases/download/$versionString/Magisk-Tailscaled-$versionString.zip" # Universal
-        zipUrl_arm="https://github.com/anasfanani/Magisk-Tailscaled/releases/download/$versionString/Magisk-Tailscaled-arm-$versionString.zip" # Arm
-        zipUrl_arm64="https://github.com/anasfanani/Magisk-Tailscaled/releases/download/$versionString/Magisk-Tailscaled-arm64-$versionString.zip" # Arm64
+        zipUrl="https://github.com/${{ github.repository }}/releases/download/$versionString/Magisk-Tailscaled-$versionString.zip" # Universal
+        zipUrl_arm="https://github.com/${{ github.repository }}/releases/download/$versionString/Magisk-Tailscaled-arm-$versionString.zip" # Arm
+        zipUrl_arm64="https://github.com/${{ github.repository }}/releases/download/$versionString/Magisk-Tailscaled-arm64-$versionString.zip" # Arm64
 
         # Update update.json
         jq '.version = $newVersion | .versionCode = $newVersionCode | .zipUrl = $newZipUrl | .changelog = $newChangelog' \
           --arg newVersion "${versionString}" \
           --arg newVersionCode "$newVersionCode" \
           --arg newZipUrl "$zipUrl" \
-          --arg newChangelog "https://raw.githubusercontent.com/anasfanani/Magisk-Tailscaled/master/CHANGELOG.md" \
+          --arg newChangelog "https://raw.githubusercontent.com/${{ github.repository }}/master/CHANGELOG.md" \
           update.json > temp.json && mv temp.json update.json
 
         # Update update-arm.json
@@ -167,7 +167,7 @@ jobs:
           --arg newVersion "${versionString}-arm" \
           --arg newVersionCode "$newVersionCode" \
           --arg newZipUrl "$zipUrl_arm" \
-          --arg newChangelog "https://raw.githubusercontent.com/anasfanani/Magisk-Tailscaled/master/CHANGELOG.md" \
+          --arg newChangelog "https://raw.githubusercontent.com/${{ github.repository }}/master/CHANGELOG.md" \
           update-arm.json > temp.json && mv temp.json update-arm.json
 
         # Update update-arm64.json
@@ -176,7 +176,7 @@ jobs:
           --arg newVersion "${versionString}-arm64" \
           --arg newVersionCode "$newVersionCode" \
           --arg newZipUrl "$zipUrl_arm64" \
-          --arg newChangelog "https://raw.githubusercontent.com/anasfanani/Magisk-Tailscaled/master/CHANGELOG.md" \
+          --arg newChangelog "https://raw.githubusercontent.com/${{ github.repository }}/master/CHANGELOG.md" \
           update-arm64.json > temp.json && mv temp.json update-arm64.json
 
     - name: Commit and push

@@ -41,14 +41,14 @@ jobs:
       run: |
         versionString="$(echo ${{ steps.check_version.outputs.version }}| tr -dc '0-9.')"
         new_tag="${{ steps.check_version.outputs.version }}"
-        zipUrl="https://github.com/anasfanani/Magisk-Tailscaled/releases/download/$new_tag/Magisk-Tailscaled-$new_tag.zip"
+        zipUrl="https://github.com/${{ github.repository }}/releases/download/$new_tag/Magisk-Tailscaled-$new_tag.zip"
         IFS='.' read -ra VERSION_PARTS <<< "$versionString"
         newVersionCode=$(printf "%02d%02d%02d%02d" "${VERSION_PARTS[0]}" "${VERSION_PARTS[1]}" "${VERSION_PARTS[2]}" "${VERSION_PARTS[3]}")
         jq '.version = $newVersion | .versionCode = $newVersionCode | .zipUrl = $newZipUrl | .changelog = $newChangelog' \
           --arg newVersion "$new_tag" \
           --arg newVersionCode "$newVersionCode" \
           --arg newZipUrl "$zipUrl" \
-          --arg newChangelog "https://raw.githubusercontent.com/anasfanani/Magisk-Tailscaled/master/CHANGELOG.txt" \
+          --arg newChangelog "https://raw.githubusercontent.com/${{ github.repository }}/master/CHANGELOG.txt" \
           update.json > temp.json && mv temp.json update.json
         sed -i "s/^version=.*/version=$versionString/" module.prop
         sed -i "s/^versionCode=.*/versionCode=$newVersionCode/" module.prop

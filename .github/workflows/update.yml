@@ -29,7 +29,7 @@ jobs:
         run: |
           NEW_TAG="${{ fromJSON(steps.get_latest_release.outputs.data).tag_name }}" 
           VERSION="${{ fromJSON(steps.get_latest_release.outputs.data).name }}"
-          CURRENT_TAG=$(curl -s https://raw.githubusercontent.com/anasfanani/Magisk-Tailscaled/master/files/VERSION.txt)
+          CURRENT_TAG=$(curl -s https://raw.githubusercontent.com/${{ github.repository }}/master/files/VERSION.txt)
           if [[ "$NEW_TAG" == "$CURRENT_TAG" && "${{ github.event.inputs.force }}" != 'true' ]]; then
             echo "Current version is up to date"
             echo "exit=true" >> $GITHUB_OUTPUT
@@ -77,14 +77,14 @@ jobs:
           versionString="${{ steps.check_version.outputs.version }}.0"
           versionString=${versionString//[^0-9.]/}
           new_tag="${{ steps.check_version.outputs.new_tag }}.0"
-          zipUrl="https://github.com/anasfanani/Magisk-Tailscaled/releases/download/$new_tag/Magisk-Tailscaled-$new_tag.zip"
+          zipUrl="https://github.com/${{ github.repository }}/releases/download/$new_tag/Magisk-Tailscaled-$new_tag.zip"
           IFS='.' read -ra VERSION_PARTS <<< "$versionString"
           newVersionCode=$(printf "%02d%02d%02d%02d" "${VERSION_PARTS[0]}" "${VERSION_PARTS[1]}" "${VERSION_PARTS[2]}" "${VERSION_PARTS[3]}")
           jq '.version = $newVersion | .versionCode = $newVersionCode | .zipUrl = $newZipUrl | .changelog = $newChangelog' \
             --arg newVersion "$new_tag" \
             --arg newVersionCode "$newVersionCode" \
             --arg newZipUrl "$zipUrl" \
-            --arg newChangelog "https://raw.githubusercontent.com/anasfanani/Magisk-Tailscaled/master/CHANGELOG.txt" \
+            --arg newChangelog "https://raw.githubusercontent.com/${{ github.repository }}/master/CHANGELOG.txt" \
             update.json > temp.json && mv temp.json update.json
           sed -i "s/^version=.*/version=$versionString/" module.prop
           sed -i "s/^versionCode=.*/versionCode=$newVersionCode/" module.prop
