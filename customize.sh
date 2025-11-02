@@ -1,5 +1,28 @@
 #!/system/bin/sh
+
+# Github download helper
+gh_download(){
+  REPO=$1
+  MATCH=$2
+  DOWNLOAD_URL=$(
+    wget --no-check-certificate -qO- "https://api.github.com/repos/${REPO}/releases/latest" | \
+    grep "browser_download_url" | \
+    grep "${MATCH}" | \
+    sed 's/.*"browser_download_url": "\([^"]*\)".*/\1/' \
+    || true \
+  )
+  if [ -z "$DOWNLOAD_URL" ]; then
+    ui_print "! Unable to get release from https://github.com/${REPO}/releases"
+    return 1
+  fi
+  FILENAME=$(basename "$DOWNLOAD_URL")
+  ui_print "- Downloading $FILENAME..."
+  wget --no-check-certificate -qO "$TMPDIR/$FILENAME" "$DOWNLOAD_URL"
+}
+
+# shellcheck disable=SC2034
 SKIPUNZIP=1
+# shellcheck disable=SC2034
 SKIPMOUNT=false
 
 if [ "$BOOTMODE" != true ]; then
@@ -12,53 +35,56 @@ fi
 
 SERVICE_DIR="/data/adb/service.d"
 
-CUSTOM_DIR="/data/adb/tailscale"
-CUSTOM_BIN_DIR="$CUSTOM_DIR/bin"
-CUSTOM_SCRIPTS_DIR="$CUSTOM_DIR/scripts"
-CUSTOM_TMP_DIR="$CUSTOM_DIR/tmp"
+TS_DIR="/data/adb/tailscale"
+TS_BIN_DIR="$TS_DIR/bin"
+TS_SCRIPTS_DIR="$TS_DIR/scripts"
 
 case $ARCH in
-    arm)   F_ARCH=$ARCH;;
-    arm64)   F_ARCH=$ARCH;;
+    arm)   F_ARCH="armv7a";;
+    arm64)   F_ARCH="aarch64";;
     *)     ui_print "Unsupported architecture: $ARCH"; abort;;
 esac
-ui_print "- Detected architecture: $F_ARCH"
+ui_print "- Detected architecture: $ARCH"
 
-ui_print "- Extracting module files"
-unzip -qqo "$ZIPFILE" -x 'META-INF/*' 'tailscale/*' 'files/*' -d "$MODPATH"
-
-if [ -d "$CUSTOM_DIR" ]; then
+if [ -d "$TS_DIR" ]; then
     ui_print "- Cleaning up old files"
-    for dir in "$CUSTOM_DIR/*"; do
+    for dir in "$TS_DIR"/*; do
         if [ "$(basename "$dir")" != "tmp" ]; then
             rm -rf "$dir"
         fi
     done
 fi
 
-ui_print "- Creating directories"
-mkdir -p "$CUSTOM_DIR" "$CUSTOM_BIN_DIR" "$CUSTOM_TMP_DIR" "$CUSTOM_SCRIPTS_DIR" "$SERVICE_DIR"
 
-ui_print "- Extracting scripts"
-unzip -qqjo "$ZIPFILE" 'tailscale/bin/*' -d "$CUSTOM_BIN_DIR"
-unzip -qqjo "$ZIPFILE" 'tailscale/scripts/*' -d "$CUSTOM_SCRIPTS_DIR"
-unzip -qqjo "$ZIPFILE" 'tailscale/settings.sh' -d "$CUSTOM_DIR"
+mkdir -p $TS_BIN_DIR
+if gh_download "anasfanani/tailscale-android-cli" "tailscale_.*_${ARCH}\.tgz"; then
+  tar -xzf "$TMPDIR/$FILENAME" -C $TS_BIN_DIR || abort "error: Unable extract archive."
+else
+  abort "error: Unable to download."
+fi
 
-ui_print "- Configuring files for $F_ARCH"
-unzip -qqjo "$ZIPFILE" "files/*" -d "$TMPDIR"
-mv -f "$TMPDIR/tailscale.combined-$F_ARCH" "$CUSTOM_BIN_DIR/tailscale.combined"
-ln -sf "$CUSTOM_BIN_DIR/tailscale.combined" "$CUSTOM_BIN_DIR/tailscale"
-ln -sf "$CUSTOM_BIN_DIR/tailscale.combined" "$CUSTOM_BIN_DIR/tailscaled"
-[ -f "$TMPDIR/coredns-$F_ARCH" ] && mv -f "$TMPDIR/coredns-$F_ARCH" "$CUSTOM_BIN_DIR/coredns"
-[ -f "$TMPDIR/Corefile" ] && mv -f "$TMPDIR/Corefile" "$CUSTOM_TMP_DIR/Corefile"
-[ -f "$TMPDIR/hevsocks-$F_ARCH" ] && mv -f "$TMPDIR/hevsocks-$F_ARCH" "$CUSTOM_BIN_DIR/hevsocks"
-[ -f "$TMPDIR/hevsocks.yaml" ] && mv -f "$TMPDIR/hevsocks.yaml" "$CUSTOM_TMP_DIR/hevsocks.yaml"
+if gh_download "theshoqanebi/jq-build-for-android" "jq-${F_ARCH}-linux-android"; then
+  mv -f "$TMPDIR/$FILENAME" "$TS_BIN_DIR/jq" || abort "error: Unable to move file."
+else
+  abort "error: Unable to download."
+fi
+
+ui_print "- Extracting files..."
+unzip -qqo "$ZIPFILE" -x 'META-INF/*' 'tailscale/*' -d "$MODPATH"
+
+
+
+mkdir -p "$TS_DIR" "$TS_SCRIPTS_DIR" "$SERVICE_DIR" "$MODPATH/system/bin/"
+unzip -qqjo "$ZIPFILE" 'tailscale/scripts/*' -d "$TS_SCRIPTS_DIR"
+unzip -qqjo "$ZIPFILE" 'tailscale/settings.sh' -d "$TS_DIR"
+ln -sf "$TS_BIN_DIR/tailscaled" "$TS_BIN_DIR/tailscale"
+ln -sf "$TS_BIN_DIR/tailscaled" "$MODPATH/system/bin/tailscale"
 
 ui_print "- Setting permissions"
-set_perm_recursive $CUSTOM_BIN_DIR 0 0 0755 0755
-set_perm_recursive $CUSTOM_SCRIPTS_DIR 0 0 0755 0755
-set_perm_recursive $MODPATH/system/bin 0 0 0755 0755
-set_perm $MODPATH/service.sh 0 0 0755
+set_perm_recursive "$TS_BIN_DIR" 0 0 0755 0755
+set_perm_recursive "$TS_SCRIPTS_DIR" 0 0 0755 0755
+set_perm_recursive "$MODPATH/system/bin" 0 0 0755 0755
+set_perm "$MODPATH/service.sh" 0 0 0755
 
 if [ ! -f "$SERVICE_DIR/tailscaled_service.sh" ]; then
     # offer to move module scripts to general scripts
@@ -74,22 +100,22 @@ if [ ! -f "$SERVICE_DIR/tailscaled_service.sh" ]; then
     ui_print "- You have 10 seconds to make a selection. Default is [Yes]."
     ui_print "- [ Vol UP(+): Yes ]"
     ui_print "- [ Vol DOWN(-): No ]"
-    start_time=`date +%s`
+    START_TIME=$(date +%s)
     while true; do
-      current_time=`date +%s`
-      time_diff=`expr $current_time - $start_time`
-      if [ $time_diff -ge 10 ]; then
+      CURRENT_TIME=$(date +%s)
+      time_diff=$(("$CURRENT_TIME" - "$START_TIME"))
+      if [ "$time_diff" -ge 10 ]; then
         ui_print "- Time's up! Proceeding with default option [Yes]."
         ui_print "- Move Module Scripts to General Scripts."
         mv -f "$MODPATH/service.sh" "$SERVICE_DIR/tailscaled_service.sh"
         break
       fi
-      getevent -lc 1 2>&1 | grep KEY_VOLUME > $TMPDIR/events
-      if $(cat $TMPDIR/events | grep -q KEY_VOLUMEUP) ; then
+      getevent -lc 1 2>&1 | grep KEY_VOLUME > "$TMPDIR"/events
+      if cat "$TMPDIR"/events | grep -q KEY_VOLUMEUP > /dev/null 2>&1; then
         ui_print "- [Yes] Move Module Scripts to General Scripts."
         mv -f "$MODPATH/service.sh" "$SERVICE_DIR/tailscaled_service.sh"
         break
-      elif $(cat $TMPDIR/events | grep -q KEY_VOLUMEDOWN) ; then
+      elif cat "$TMPDIR"/events | grep -q KEY_VOLUMEDOWN > /dev/null 2>&1; then
         ui_print "- [No] Skip and keep using Module Scripts."
         break
       fi
@@ -99,17 +125,18 @@ else
     mv -f "$MODPATH/service.sh" "$SERVICE_DIR/tailscaled_service.sh"
 fi
 ui_print "- Starting service in background."
-${CUSTOM_SCRIPTS_DIR}/start.sh postinstall 2>&1 &
+${TS_SCRIPTS_DIR}/start.sh postinstall 2>&1 &
 if [ ! -f "/system/bin/tailscale" ] || ! cmp --silent "/system/bin/tailscale" "$MODPATH/system/bin/tailscale"; then
   ui_print "- Link file to /dev/."
-  ln -sf "$CUSTOM_SCRIPTS_DIR/tailscaled.service" /dev/tailscaled.service
-  ln -sf "$MODPATH/system/bin/tailscale" /dev/tailscale
+  ln -sf "$TS_SCRIPTS_DIR/tailscaled.service" /dev/tailscaled.service
+  ln -sf "$TS_BIN_DIR/tailscaled" /dev/tailscaled
+  ln -sf "$TS_BIN_DIR/tailscaled" /dev/tailscale
   ui_print "-----------------------------------------------------------"
   ui_print " Instructions       "
   ui_print "-----------------------------------------------------------"
   ui_print "- If you not reboot, execute with /dev/tailscale or /dev/tailscaled.service."
   ui_print "- After reboot, you can use tailscale and tailscaled.service directly."
-  if [ ! -f "$CUSTOM_TMP_DIR/tailscaled.state" ]; then
+  if [ ! -f "$TS_DIR/tailscaled.state" ]; then
     ui_print "- Quickstart to new user :"
     ui_print "  su -c '/dev/tailscale login'"
     ui_print "  su -c '/dev/tailscaled.service status'"
@@ -119,7 +146,7 @@ if [ ! -f "/system/bin/tailscale" ] || ! cmp --silent "/system/bin/tailscale" "$
     ui_print "  su -c '/dev/tailscaled.service'"
   fi
 else
-  if [ ! -f "$CUSTOM_TMP_DIR/tailscaled.state" ]; then
+  if [ ! -f "$TS_DIR/tailscaled.state" ]; then
     ui_print "- Quickstart to login :"
     ui_print "  su -c 'tailscale login'"
     ui_print "  su -c 'tailscaled.service status'"
