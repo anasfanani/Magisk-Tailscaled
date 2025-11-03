@@ -48,10 +48,11 @@ ui_print "- Detected architecture: $ARCH"
 
 if [ -d "$TS_DIR" ]; then
     ui_print "- Cleaning up old files"
-    for dir in "$TS_DIR"/*; do
-        if [ "$(basename "$dir")" != "tmp" ]; then
-            rm -rf "$dir"
-        fi
+    for p in "$TS_DIR"/* "$TS_DIR"/.??*; do
+      case "$p" in
+        "$TS_DIR"/tailscaled.state|"$TS_DIR"/ssh|"$TS_DIR"/certs) ;;
+        *) echo rm -rf -- "$p" ;;
+      esac
     done
 fi
 
