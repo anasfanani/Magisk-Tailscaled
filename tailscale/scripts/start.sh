@@ -10,7 +10,7 @@ case "$1" in
     ;;
 esac
 start_service() {
-  if [ ! -f "${MOD_DIR}/disable" ]; then
+  if [ ! -f "${TS_MOD_DIR}/disable" ]; then
     tailscaled.service start >> "/dev/null" 2>&1
   fi
 }
@@ -21,10 +21,10 @@ start_inotifyd() {
     fi
   done
   echo "${CURRENT_TIME} [Info]: Starting tailscaled inotify service" > "${TS_RUN_LOG_FILE}"
-  inotifyd "tailscaled.inotify" "${MOD_DIR}" >> "/dev/null" 2>&1 &
+  inotifyd "tailscaled.inotify" "${TS_MOD_DIR}" >> "/dev/null" 2>&1 &
 }
 
-module_version=$(busybox awk -F'=' '!/^ *#/ && /version=/ { print $2 }' "$MOD_PROP" 2>/dev/null)
+module_version=$(busybox awk -F'=' '!/^ *#/ && /version=/ { print $2 }' "$TS_MOD_PROP" 2>/dev/null)
 log Info "Magisk Tailscaled version : ${module_version}."
 start_service
 start_inotifyd

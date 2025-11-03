@@ -1,4 +1,31 @@
 #!/system/bin/sh
+# @title Tailscaled Service Manager
+# @header Manage and customize how tailscaled runs on your Android.
+#
+# @cmd start | Start tailscaled service
+# @desc Read configuration file in ${TS_DIR}/ and store output log to ${TS_LOG_FILE} then write pid file to ${TS_RUN_DIR}.
+#
+# @cmd stop | Stop tailscaled service
+# @desc Kill with signal 15, waiting to process doing self cleanup, if still running, then force kill.
+#
+# @cmd restart | Restart tailscaled service
+# @desc Kill, waiting, then start the process again, this command also rename file log to ${TS_LOG_FILE}.bak, always have .bak from last running process.
+#
+# @cmd status | Show current process status
+# @sub summary | Show summary with Self info and peer counts (default)
+# @sub peer | Show all peers (online/offline)
+# @sub exit-node | Show all exit nodes
+# @sub all | Show everything (Self + peers + exit nodes)
+# @desc Retrieving info from daemon, useful for inspect current running process.
+#
+# @cmd log | Logging tools
+# @sub daemon | Tailscaled daemon log (follow mode)
+# @sub service | Service operation log
+# @desc View logs from tailscaled daemon, service.
+#
+# @cmd help | Show this help message
+# @sub all | Show detailed descriptions for all commands
+#
 set -e
 DIR=$(dirname "$(realpath "$0")")
 # shellcheck source=../settings.sh
@@ -69,7 +96,7 @@ program(){
       fi
     else
       log Info "✘ ${program_name} service is not running."
-      [ -t 1 ] && echo "${white}--------------------------------------------${normal}"
+      [ -t 1 ] && echo "${yellow}--------------------------------------------${normal}"
       return 0
     fi
     sleep 3 # wait the binary has stopped properly
@@ -77,7 +104,7 @@ program(){
       log Info "✘ ${program_name} shutting down, service is stopped."
       log Info "✘ ${program_name} disconnected."
       if [ ! -z "${post_down}" ];then $post_down  2>&1; fi
-      [ -t 1 ] && echo "${white}--------------------------------------------${normal}"
+      [ -t 1 ] && echo "${yellow}--------------------------------------------${normal}"
       return 0
     else
       log Warning "⚠️ ${program_name} Not stopped; may still be shutting down or failed to shut down."
@@ -97,7 +124,7 @@ program(){
       if ! busybox pgrep -f "${command}" >/dev/null 2>&1; then
         log Info "✔ done, you can sleep peacefully."
         if [ ! -z "${post_down}" ];then post_down  2>&1; fi
-        [ -t 1 ] && echo "${white}--------------------------------------------${normal}"
+        [ -t 1 ] && echo "${yellow}--------------------------------------------${normal}"
         return 0
       fi
     fi
@@ -116,10 +143,10 @@ _tailscaled(){
   logdir="${TS_DIR}/run"
   command="${TS_DAEMON_CMD}"
   tailscaled_up(){
-    sed -Ei "s/^description=(\[.*][[:space:]]*)?/description=[ ⏲ $CURRENT_TIME | ✔ tailscaled service is running!!! ] /g" "$MOD_PROP"
+    sed -Ei "s/^description=(\[.*][[:space:]]*)?/description=[ ⏲ $CURRENT_TIME | ✔ tailscaled service is running!!! ] /g" "$TS_MOD_PROP"
   }
   tailscaled_down(){
-    sed -Ei "s/^description=(\[.*][[:space:]]*)?/description=[ ⏲ $CURRENT_TIME | ✘ tailscaled shutting down, service is stopped !!! ] /g" "$MOD_PROP"
+    sed -Ei "s/^description=(\[.*][[:space:]]*)?/description=[ ⏲ $CURRENT_TIME | ✘ tailscaled shutting down, service is stopped !!! ] /g" "$TS_MOD_PROP"
   }
   pre_up=""
   pre_down=""
@@ -155,29 +182,162 @@ _tailscaled(){
 }
 
 status_tailscaled(){
+  mode="${1:-summary}"
+  humanize_bytes() {
+    awk -v bytes="$1" 'BEGIN {
+      if (bytes < 1024) printf "%.0fB", bytes
+      else if (bytes < 1048576) printf "%.2fKB", bytes/1024
+      else if (bytes < 1073741824) printf "%.2fMB", bytes/1048576
+      else printf "%.2fGB", bytes/1073741824
+    }'
+  }
   echo "${blue}Service Status Info${normal}"
-  if _tailscaled status; then
-      echo "${green}running${normal}"
-      # set +x
+  echo ""
+  if _tailscaled status >/dev/null 2>&1; then
+      printf "  ${blue}Daemon: ${green}%s${normal}" "running"
       ts_status=$(tailscale status --json)
-      # set -x
       ts_status_backend="$(echo "$ts_status" | jq -r .BackendState)"
       if [ "$ts_status_backend" != "Running" ]; then
-        echo "  Backend: $ts_status_backend"
+        printf " | ${blue}Backend: ${yellow}%s${normal}\n" "$ts_status_backend"
         return 1
       fi
-      ipv4=$(echo "$ts_status" | jq -r .TailscaleIPs[0])
-      ipv6=$(echo "$ts_status" | jq -r .TailscaleIPs[1])
-      printf "  ↳ ipv4  \t\t\t${yellow}%s${normal}\n" "${ipv4}"
-      printf "  ↳ ipv6  \t\t\t${yellow}%s${normal}\n" "${ipv6}"
-      echo "$ts_status" | jq -r --arg green "$green" --arg red "$red" --arg orange "$orange" --arg yellow "$yellow" --arg normal "$normal" '
-        (.Peer | to_entries | map(select(.value.Online == true)) | "  ↳ Online (\($green)\(length)\($normal))"),
-        (.Peer | to_entries | map(select(.value.Online == true)) | .[] | "\t  ↳ \($green)\(.value.HostName)\($normal)\t\($orange)\(.value.Relay)\($normal) \($yellow)\(.value.TailscaleIPs[0])\($normal) \($orange)\(.value.OS)\($normal)"),
-        (.Peer | to_entries | map(select(.value.Online == false)) | "  ↳ Offline (\($red)\(length)\($normal))"),
-        (.Peer | to_entries | map(select(.value.Online == false)) | .[] | "\t  ↳ \($red)\(.value.HostName)\($normal)\t\($orange)\(.value.Relay)\($normal) \($yellow)\(.value.TailscaleIPs[0])\($normal) \($orange)\(.value.OS)\($normal)")
-      ' | while IFS= read -r line; do echo "$line"; done
+      printf " | ${blue}Backend: ${green}%s${normal}\n" "$ts_status_backend"
+      echo ""
+      
+      # Show Self section for summary and all modes only
+      case "$mode" in
+        summary|all)
+          self_hostname=$(echo "$ts_status" | jq -r '.Self.HostName')
+          self_os=$(echo "$ts_status" | jq -r '.Self.OS')
+          self_relay=$(echo "$ts_status" | jq -r '.Self.Relay')
+          if [ -f "${TS_DIR}/derpmap.cached.json" ] && [ "$self_relay" != "null" ]; then
+            self_relay_name=$(jq -r --arg code "$self_relay" '.Regions | to_entries[] | select(.value.RegionCode == $code) | .value.RegionName' "${TS_DIR}/derpmap.cached.json")
+            [ -n "$self_relay_name" ] && self_relay="$self_relay_name"
+          fi
+          ipv4=$(echo "$ts_status" | jq -r '.Self.TailscaleIPs[0]')
+          ipv6=$(echo "$ts_status" | jq -r '.Self.TailscaleIPs[1]')
+          
+          printf "  ${blue}Self:${normal} ${yellow}%s${normal} ${orange}(%s)${normal}\n" "$self_hostname" "$self_os"
+          printf "    ↳ Relay: ${yellow}%s${normal}\n" "$self_relay"
+          printf "    ↳ Tailscale IPs: ${yellow}%s${normal}, ${yellow}%s${normal}\n" "$ipv4" "$ipv6"
+          
+          magic_dns=$(echo "$ts_status" | jq -r '.CurrentTailnet.MagicDNSEnabled')
+          magic_dns_suffix=$(echo "$ts_status" | jq -r '.MagicDNSSuffix')
+          printf "    ↳ DNS: "
+          if [ "$magic_dns" = "true" ]; then
+            printf "${green}%s${normal} (${yellow}%s${normal})\n" "Enabled" "$magic_dns_suffix"
+          else
+            printf "${red}%s${normal}\n" "Disabled"
+          fi
+          
+          addr_count=$(echo "$ts_status" | jq -r '.Self.Addrs | length')
+          printf "    ↳ Endpoints ${orange}(%s)${normal}:\n" "$addr_count"
+          echo "$ts_status" | jq -r '.Self.Addrs[]' | while read -r addr; do
+            ip_addr=$(echo "$addr" | sed 's/\[//g;s/\].*//g;s/:.*//g')
+            iface=$(ip -o addr show | grep "$ip_addr" | awk '{print $2}' | head -1)
+            
+            if echo "$addr" | grep -q '^\['; then
+              addr_type="IPv6"
+            elif echo "$ip_addr" | grep -qE '^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)'; then
+              addr_type="Private"
+            else
+              addr_type="Public"
+            fi
+            
+            if [ -n "$iface" ]; then
+              printf "      ↳ ${yellow}%s${normal} ${orange}(%s, %s)${normal}\n" "$addr" "$iface" "$addr_type"
+            else
+              printf "      ↳ ${yellow}%s${normal} ${orange}(%s)${normal}\n" "$addr" "$addr_type"
+            fi
+          done
+          echo ""
+          
+          # Show current exit node connection if exists
+          exit_node_id=$(echo "$ts_status" | jq -r '.ExitNodeStatus.ID // empty')
+          if [ -n "$exit_node_id" ]; then
+            exit_node_online=$(echo "$ts_status" | jq -r '.ExitNodeStatus.Online')
+            exit_node_ip=$(echo "$ts_status" | jq -r '.ExitNodeStatus.TailscaleIPs[0]' | cut -d'/' -f1)
+            exit_node_hostname=$(echo "$ts_status" | jq -r --arg id "$exit_node_id" '.Peer | to_entries[] | select(.value.ID == $id) | .value.HostName')
+            exit_node_rx=$(echo "$ts_status" | jq -r --arg id "$exit_node_id" '.Peer | to_entries[] | select(.value.ID == $id) | .value.RxBytes')
+            exit_node_tx=$(echo "$ts_status" | jq -r --arg id "$exit_node_id" '.Peer | to_entries[] | select(.value.ID == $id) | .value.TxBytes')
+            if [ "$exit_node_online" = "true" ]; then
+              printf "  ${blue}Exit Node: ${green}Connected${normal} to ${yellow}%s${normal}\n" "$exit_node_hostname"
+            else
+              printf "  ${blue}Exit Node: ${red}Offline${normal} ${yellow}%s${normal}\n" "$exit_node_hostname"
+            fi
+            printf "    ↳ IP: ${yellow}%s${normal}\n" "$exit_node_ip"
+            printf "    ↳ Traffic: ${green}↓${normal} ${yellow}%s${normal} | ${red}↑${normal} ${yellow}%s${normal}\n" "$(humanize_bytes "$exit_node_rx")" "$(humanize_bytes "$exit_node_tx")"
+            echo ""
+          fi
+        ;;
+      esac
+      
+      online_count=$(echo "$ts_status" | jq '[.Peer | to_entries | .[] | select(.value.Online == true)] | length')
+      offline_count=$(echo "$ts_status" | jq '[.Peer | to_entries | .[] | select(.value.Online == false)] | length')
+      exit_online=$(echo "$ts_status" | jq '[.Peer | to_entries | .[] | select(.value.ExitNodeOption == true and .value.Online == true)] | length')
+      exit_offline=$(echo "$ts_status" | jq '[.Peer | to_entries | .[] | select(.value.ExitNodeOption == true and .value.Online == false)] | length')
+      
+      case "$mode" in
+        summary)
+          printf "  ${blue}Peers:${normal} ${green}%s online${normal}, ${red}%s offline${normal}\n" "$online_count" "$offline_count"
+          printf "    ↳ By OS: "
+          first=true
+          echo "$ts_status" | jq -r '
+            [.Peer | to_entries | .[] | {os: .value.OS, online: .value.Online}] |
+            group_by(.os) | 
+            map({
+              os: .[0].os,
+              online: map(select(.online == true)) | length,
+              offline: map(select(.online == false)) | length
+            }) | 
+            .[] | "\(.os):\(.online):\(.offline)"
+          ' | while IFS=: read -r os online offline; do
+            if [ "$first" = true ]; then
+              first=false
+            else
+              printf ", "
+            fi
+            printf "%s (${green}%s${normal}|${red}%s${normal})" "$os" "$online" "$offline"
+          done
+          printf "\n"
+          printf "    ↳ By Relay:\n"
+          if [ -f "${TS_DIR}/derpmap.cached.json" ]; then
+            echo "$ts_status" | jq -r --slurpfile derp "${TS_DIR}/derpmap.cached.json" '
+              [.Peer | to_entries | .[].value.Relay] | group_by(.) | map(. as $group | {
+                code: $group[0],
+                count: ($group | length),
+                name: ([$derp[0].Regions | to_entries[] | select(.value.RegionCode == $group[0]) | .value.RegionName][0] // $group[0])
+              }) | .[] | "\(.name):\(.count)"
+            ' | while IFS=: read -r region count; do
+              printf "      ↳ %s: ${yellow}%s${normal}\n" "$region" "$count"
+            done
+          else
+            echo "$ts_status" | jq -r '[.Peer | to_entries | .[].value.Relay] | group_by(.) | .[] | "\(.[0]):\(length)"' | while IFS=: read -r region count; do
+              printf "      ↳ %s: ${yellow}%s${normal}\n" "$region" "$count"
+            done
+          fi
+          printf "    ↳ Exit Nodes: ${green}%s online${normal}, ${red}%s offline${normal}\n" "$exit_online" "$exit_offline"
+        ;;
+        peer|all)
+          printf "  ${blue}Peers:${normal} ${green}%s online${normal}, ${red}%s offline${normal}\n" "$online_count" "$offline_count"
+          echo "$ts_status" | jq -r --arg green "$green" --arg red "$red" --arg orange "$orange" --arg yellow "$yellow" --arg normal "$normal" '
+            (.Peer | to_entries | map(select(.value.Online == true)) | "    ↳ Online (\($green)\(length)\($normal))"),
+            (.Peer | to_entries | map(select(.value.Online == true)) | .[] | "      ↳ \($green)\(.value.HostName)\($normal)\t\($orange)\(.value.Relay)\($normal) \($yellow)\(.value.TailscaleIPs[0])\($normal) \($orange)\(.value.OS)\($normal)"),
+            (.Peer | to_entries | map(select(.value.Online == false)) | "    ↳ Offline (\($red)\(length)\($normal))"),
+            (.Peer | to_entries | map(select(.value.Online == false)) | .[] | "      ↳ \($red)\(.value.HostName)\($normal)\t\($orange)\(.value.Relay)\($normal) \($yellow)\(.value.TailscaleIPs[0])\($normal) \($orange)\(.value.OS)\($normal)")
+          ' | while IFS= read -r line; do echo "$line"; done
+          [ "$mode" = "all" ] && echo ""
+        ;;
+      esac
+      
+      case "$mode" in
+        exit-node|all)
+          printf "  ${blue}Exit Nodes:${normal} ${green}%s online${normal}, ${red}%s offline${normal}\n" "$exit_online" "$exit_offline"
+          echo "$ts_status" | jq -r --arg green "$green" --arg red "$red" --arg orange "$orange" --arg yellow "$yellow" --arg normal "$normal" '.Peer | to_entries | map(select(.value.ExitNodeOption == true)) | .[] | if .value.Online then "    ↳ \($green)\(.value.HostName)\($normal)\t\($orange)\(.value.Relay)\($normal) \($yellow)\(.value.TailscaleIPs[0])\($normal) \($orange)\(.value.OS)\($normal)" else "    ↳ \($red)\(.value.HostName)\($normal)\t\($orange)\(.value.Relay)\($normal) \($yellow)\(.value.TailscaleIPs[0])\($normal) \($orange)\(.value.OS)\($normal)" end' | while IFS= read -r line; do echo "$line"; done
+        ;;
+      esac
   else
-      echo "${red}stopped${normal}"
+      printf "  ${blue}Daemon: ${red}%s${normal}\n" "stopped"
   fi
 }
 _log(){
@@ -189,11 +349,7 @@ _log(){
       busybox tail -q -n +1 -F "${TS_LOG_FILE}"
       ;;
     *)
-      if [ -n "$1" ]; then
-        echo "${yellow}${scripts_name} ${yellow}log ${orange}$1 - ${normal}${red}Error: ${normal}command not found."
-        return
-      fi
-      echo "${yellow}usage${normal}: ${green}${scripts_name}${normal} ${yellow}log${normal} {${orange}service|daemon${normal}}"
+      usage log
       ;;
   esac
   
@@ -202,37 +358,105 @@ _troubleshoot(){
   echo "${red}Not yet ready!${normal}";
   echo "${orange}Solution: ${yellow}Join telegram group at: [ ${green}https://t.me/systembinsh/158${normal} ${yellow}]${normal}";
 }
-help(){
-    if [ "$1" = "default" ]; then
-      expand=false
-    elif [ "$1" = "all" ]; then
-      expand=true
-      all=true
-    elif [ -z "$1" ];then
-      expand=true
+usage(){
+    cmd="$1"
+    cmds=""
+    opts=""
+    in_cmd=false
+    while IFS= read -r line; do
+        case "$line" in
+            "# @cmd "*)
+                if [ -z "$cmd" ]; then
+                    # Global usage: collect all commands
+                    line="${line#\# @cmd }"
+                    c="${line%%\|*}"
+                    c=$(echo "$c" | xargs)
+                    [ -z "$cmds" ] && cmds="$c" || cmds="$cmds|$c"
+                elif echo "$line" | grep -q "^# @cmd $cmd "; then
+                    # Found target command
+                    in_cmd=true
+                elif [ "$in_cmd" = true ]; then
+                    # Hit next command, stop
+                    break
+                fi
+                ;;
+            "# @sub "*)
+                if [ "$in_cmd" = true ]; then
+                    line="${line#\# @sub }"
+                    subcmd="${line%%\|*}"
+                    subcmd=$(echo "$subcmd" | xargs)
+                    [ -z "$opts" ] && opts="$subcmd" || opts="$opts|$subcmd"
+                fi
+                ;;
+        esac
+    done < "$0"
+    
+    if [ -z "$cmd" ]; then
+        echo "${yellow}usage${normal}: ${green}${scripts_name}${normal} {${orange}$cmds${normal}}"
     else
-      echo "${yellow}${scripts_name} ${yellow}help ${orange}$1 - ${normal}${red}Error: ${normal}command not found."
-      return
+        echo "${yellow}usage${normal}: ${green}${scripts_name}${normal} ${yellow}$cmd${normal} {${orange}$opts${normal}}"
     fi
-    description() {
-      w=0
-      printf "%s" "$1" | busybox fold -sw70 | while IFS= read -r line; do
-        [ $w = 1 ] && printf "  ${yellow}↨${normal}\t\t  %s\n" "$line"
-        [ $w = 0 ] && printf "  ${yellow}↨${normal}\t\t%s\n" "↳ $line"; w=1;
-      done
-    }
-    echo "${green}Tailscaled Service Manager${normal}"
-    echo "Manage and customizing how tailscaled runs on your Android."
+}
+
+help(){
+    show_all="${1}"
+    
+    # Parse and display title/header
+    while IFS= read -r line; do
+        case "$line" in
+            "# @title "*)
+                title="${line#\# @title }"
+                echo "${green}${title}${normal}"
+                ;;
+            "# @header "*)
+                header="${line#\# @header }"
+                echo "${header}"
+                ;;
+            "# @cmd "*)
+                break
+                ;;
+        esac
+    done < "$0"
+    
     echo "${blue}Available Command:${normal}"
-    printf "${yellow}%s${normal}       \t• %s\n" "start" "Start tailscaled service" && [ -z "$all" ] || description "Read configuration file in ${TS_DIR}/ and store output log to ${TS_LOG_FILE} then write pid file to ${TS_RUN_DIR}."
-    printf "${yellow}%s${normal}       \t• %s\n" "stop" "Stop tailscaled service" && [ -z "$all" ] || description "Kill with signal 15, waiting to process doing self cleanup, if still running, then force kill."
-    printf "${yellow}%s${normal}       \t• %s\n" "restart" "Restart tailscaled service" && [ -z "$all" ] || description "Kill, waiting, then start the process again, this command also rename file log to ${TS_LOG_FILE}.bak, always have .bak from last running process."
-    printf "${yellow}%s${normal}       \t• %s\n" "status" "Show current process status" && [ -z "$all" ] || description "Retreiving info from daemon, usefull for inspect current running process."
-    printf "${yellow}%s${normal}       \t• %s\n" "log" "Logging tools" && [ -z "$all" ] || description "View logs from tailscaled daemon, service."
-    if $expand; then
-      printf "  ${yellow}↳${normal} ${orange}%s${normal}   \t- %s\n" "daemon" "Tailscaled daemon log."
-      printf "  ${yellow}↳${normal} ${orange}%s${normal}   \t- %s\n" "service" "Service operation log."
-    fi
+    
+    # Parse and display commands
+    while IFS= read -r line; do
+        case "$line" in
+            "# @cmd "*)
+                line="${line#\# @cmd }"
+                IFS='|' read -r cmd desc <<EOF
+$line
+EOF
+                cmd=$(echo "$cmd" | xargs)
+                desc=$(echo "$desc" | xargs)
+                printf "${yellow}%-15s${normal}\t• %s\n" "$cmd" "$desc"
+                ;;
+            "# @sub "*)
+                line="${line#\# @sub }"
+                IFS='|' read -r subcmd desc <<EOF
+$line
+EOF
+                subcmd=$(echo "$subcmd" | xargs)
+                desc=$(echo "$desc" | xargs)
+                printf "  ${yellow}↳${normal} ${orange}%-11s${normal}\t- %s\n" "$subcmd" "$desc"
+                ;;
+            "# @desc "*)
+                if [ "$show_all" = "all" ]; then
+                    desc="${line#\# @desc }"
+                    first=true
+                    echo "$desc" | busybox fold -sw70 | while IFS= read -r dline; do
+                        if [ "$first" = true ]; then
+                            printf "    ${yellow}↳${normal} %s\n" "$dline"
+                            first=false
+                        else
+                            printf "      %s\n" "$dline"
+                        fi
+                    done
+                fi
+                ;;
+        esac
+    done < "$0"
 }
 
 case "$1" in
@@ -246,7 +470,7 @@ case "$1" in
     _tailscaled restart
     ;;
   status)
-    status_tailscaled
+    status_tailscaled "$2"
     ;;
   log)
     _log "$2"
@@ -259,9 +483,9 @@ case "$1" in
     ;;
   *)
     if [ -n "$1" ]; then
-      echo "${yellow}${scripts_name} ${orange}$1 ${red}not found${normal}, run ${yellow}${scripts_name} ${orange}help${normal} for all command"
+      echo "${yellow}${scripts_name} ${orange}$1 ${red}not found${normal}, run ${yellow}${scripts_name} help${normal} for all commands"
       return
     fi
-    help "default"
+    usage
     ;;
 esac
