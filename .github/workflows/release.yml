@@ -1,0 +1,89 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      bump:
+        type: choice
+        description: 'Version bump type'
+        options:
+          - none
+          - major
+          - minor
+          - patch
+          - build
+        default: 'none'
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Bump version
+        if: github.event_name == 'workflow_dispatch' && inputs.bump != 'none'
+        run: ./.github/tools/version-bump.sh ${{ inputs.bump }}
+
+      - name: Sync version from tag
+        if: github.event_name == 'push'
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/}"
+          CURRENT_VERSION=$(grep '^version=' module.prop | cut -d'=' -f2)
+          if [[ "$TAG_VERSION" != "$CURRENT_VERSION" ]]; then
+            echo "Tag $TAG_VERSION doesn't match module.prop $CURRENT_VERSION, updating..."
+            VERSION_NUM=${TAG_VERSION#v}
+            IFS='.' read -r MAJOR MINOR PATCH BUILD <<< "$VERSION_NUM"
+            VERSION_CODE=$(printf "%02d%02d%02d%02d" "$MAJOR" "$MINOR" "$PATCH" "$BUILD")
+            sed -i "s/^version=.*/version=$TAG_VERSION/" module.prop
+            sed -i "s/^versionCode=.*/versionCode=$VERSION_CODE/" module.prop
+          fi
+
+      - name: Get version
+        id: version
+        run: echo "version=$(grep '^version=' module.prop | cut -d'=' -f2)" >> $GITHUB_OUTPUT
+
+      - name: Build
+        run: ./.github/tools/build.sh
+
+      - name: Create Release
+        id: release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Magisk Tailscaled ${{ steps.version.outputs.version }}
+          files: dist/*.zip
+          generate_release_notes: true
+          append_body: true
+          body: |
+            ## Downloads
+            - **Magisk-Tailscaled-${{ steps.version.outputs.version }}.zip** - Lightweight (downloads binaries on install)
+            - **Magisk-Tailscaled-${{ steps.version.outputs.version }}-full.zip** - Complete package (includes all binaries)
+            
+            ## Download Stats
+            ![GitHub Downloads](https://img.shields.io/github/downloads/anasfanani/Magisk-Tailscaled/${{ steps.version.outputs.version }}/Magisk-Tailscaled-${{ steps.version.outputs.version }}.zip?style=flat&logo=docusign&logoColor=green&label=Lightweight)
+            ![GitHub Downloads](https://img.shields.io/github/downloads/anasfanani/Magisk-Tailscaled/${{ steps.version.outputs.version }}/Magisk-Tailscaled-${{ steps.version.outputs.version }}-full.zip?style=flat&logo=docusign&logoColor=green&label=Full%20Package)
+
+      - name: Update JSON with release URLs
+        env:
+          ASSETS: ${{ steps.release.outputs.assets }}
+        run: |
+          ZIP_URL=$(echo '${{ steps.release.outputs.assets }}' | jq -r '.[] | select(.name | endswith(".zip") and (contains("-full") | not)) | .browser_download_url')
+          jq --arg url "$ZIP_URL" '.zipUrl = $url' update.json > update.json.tmp && mv update.json.tmp update.json
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add module.prop update.json
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Release ${{ steps.version.outputs.version }}"
+            if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+              git push
+            fi
+          fi

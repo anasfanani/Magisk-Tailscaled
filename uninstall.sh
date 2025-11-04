@@ -1,3 +1,4 @@
+#!/system/bin/sh
 rm -rf /data/adb/tailscale
 SERVICE_DIR="/data/adb/service.d"
 if [ -f "$SERVICE_DIR/tailscaled_service.sh" ]; then

@@ -1,19 +1,20 @@
 #!/system/bin/sh
-DIR=$(dirname $(realpath $0))
-source $DIR/../settings.sh
+DIR=$(dirname "$(realpath "$0")")
+# shellcheck source=../settings.sh
+. "$DIR"/../settings.sh
 
 events="$1"
-monitor_dir="$2"
+# monitor_dir="$2"
 monitor_file="$3"
 
 service_control() {
   if [ "${monitor_file}" = "disable" ]; then
     if [ "${events}" = "d" ]; then
-      echo "${current_time} [Info]: ✔ Starting tailscaled service" >> "${tailscaled_runs_log}"
-      "${tailscaled_service}" start 2>&1 >> "${tailscaled_runs_log}"
+      echo "${CURRENT_TIME} [Info]: ✔ Starting tailscaled service" >>"${TS_RUN_LOG_FILE}"
+      tailscaled.service start >>"${TS_RUN_LOG_FILE}" 2>&1
     elif [ "${events}" = "n" ]; then
-      echo "${current_time} [Info]: ✘ Stopping tailscaled service" >> "${tailscaled_runs_log}"
-      "${tailscaled_service}" stop 2>&1 >> "${tailscaled_runs_log}"
+      echo "${CURRENT_TIME} [Info]: ✘ Stopping tailscaled service" >>"${TS_RUN_LOG_FILE}"
+      tailscaled.service stop >>"${TS_RUN_LOG_FILE}" 2>&1
     fi
   fi
 }
