@@ -44,7 +44,16 @@ jobs:
 
       - name: Get version
         id: version
-        run: echo "version=$(grep '^version=' module.prop | cut -d'=' -f2)" >> $GITHUB_OUTPUT
+        run: |
+          VERSION=$(grep '^version=' module.prop | cut -d'=' -f2)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          # Check if it's a build release (last digit is not 0)
+          BUILD=$(echo "$VERSION" | cut -d'.' -f4)
+          if [ "$BUILD" != "0" ]; then
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Build
         run: ./.github/tools/build.sh
@@ -57,6 +66,7 @@ jobs:
           name: Magisk Tailscaled ${{ steps.version.outputs.version }}
           files: dist/*.zip
           generate_release_notes: true
+          prerelease: ${{ steps.version.outputs.prerelease }}
           append_body: true
           body: |
             ## Downloads
@@ -72,17 +82,19 @@ jobs:
           ASSETS: ${{ steps.release.outputs.assets }}
         run: |
           ZIP_URL=$(echo '${{ steps.release.outputs.assets }}' | jq -r '.[] | select(.name | endswith(".zip") and (contains("-full") | not)) | .browser_download_url')
-          jq --arg url "$ZIP_URL" '.zipUrl = $url' update.json > update.json.tmp && mv update.json.tmp update.json
+          for json_file in update.json update-arm.json update-arm64.json; do
+            jq --arg url "$ZIP_URL" '.zipUrl = $url' "$json_file" > "${json_file}.tmp" && mv "${json_file}.tmp" "$json_file"
+          done
 
       - name: Commit changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add module.prop update.json
+          git add module.prop update*.json CHANGELOG.md
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Release ${{ steps.version.outputs.version }}"
+            git commit -m "Bump version to ${{ steps.version.outputs.version }}"
             if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
               git push
             fi
