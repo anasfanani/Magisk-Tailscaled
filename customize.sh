@@ -1,6 +1,6 @@
 #!/system/bin/sh
 
-DEBUG=1
+# DEBUG=1
 [ -n "$DEBUG" ] && {
 	PS4="+ \${0##*/}:\${LINENO}: "
 	set -e

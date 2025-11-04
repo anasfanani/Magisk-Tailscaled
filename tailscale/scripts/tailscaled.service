@@ -195,7 +195,7 @@ status_tailscaled(){
   echo ""
   if _tailscaled status >/dev/null 2>&1; then
       printf "  ${blue}Daemon: ${green}%s${normal}" "running"
-      ts_status=$(tailscale status --json)
+      ts_status=$(timeout 10 tailscale status --json 2>/dev/null || echo '{}')
       ts_status_backend="$(echo "$ts_status" | jq -r .BackendState)"
       if [ "$ts_status_backend" != "Running" ]; then
         printf " | ${blue}Backend: ${yellow}%s${normal}\n" "$ts_status_backend"
