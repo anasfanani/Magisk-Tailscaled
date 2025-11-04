@@ -1,38 +1,31 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tailscale Manager</title>
-    <link rel="stylesheet" href="style.css" />
-  </head>
-  <body>
-    <div class="container">
-      <h1>Tailscale Manager</h1>
-
-      <div class="status-card">
-        <h2>Status</h2>
-        <div id="status">Loading...</div>
-      </div>
-
-      <div class="actions">
-        <button id="btn-refresh">Refresh</button>
-        <button id="btn-start">Start Service</button>
-        <button id="btn-stop">Stop Service</button>
-        <button id="btn-login">Login</button>
-      </div>
-
-      <div class="info-card">
-        <h2>Device Info</h2>
-        <div id="info"></div>
-      </div>
-
-      <div class="log-card">
-        <h2>Logs</h2>
-        <pre id="logs"></pre>
-      </div>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tailscale Magisk</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Tailscale Magisk</h1>
+    
+    <div class="status-card">
+      <div class="status-label">Status:</div>
+      <div id="status" class="status-value">Loading...</div>
     </div>
 
-    <script type="module" src="app.ts"></script>
-  </body>
+    <div class="status-card">
+      <div class="status-label">IP Address:</div>
+      <div id="ip" class="status-value">-</div>
+    </div>
+
+    <div class="button-group">
+      <button id="up-btn" class="btn btn-primary">Connect</button>
+      <button id="down-btn" class="btn btn-secondary">Disconnect</button>
+    </div>
+  </div>
+
+  <script type="module" src="app.ts"></script>
+</body>
 </html>
