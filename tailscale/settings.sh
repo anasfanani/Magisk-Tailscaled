@@ -62,4 +62,4 @@ log() {
   fi
 }
 
-[ ! -z "$DEBUG" ] && set -u && set -x && PS4='+ ${0##*/}:${LINENO}: ' || true
+[ -n "${DEBUG:-}" ] && set -u && set -x && PS4='+ ${0##*/}:${LINENO}: ' || true

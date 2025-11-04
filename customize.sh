@@ -1,7 +1,7 @@
 #!/system/bin/sh
 
 # DEBUG=1
-[ -n "$DEBUG" ] && {
+[ -n "${DEBUG:-}" ] && {
 	PS4="+ \${0##*/}:\${LINENO}: "
 	set -e
 	set -u
@@ -14,7 +14,7 @@ gh_download() {
 	REPO=$1
 	MATCH=$2
 	DOWNLOAD_URL=$(
-		wget --no-check-certificate -qO- "https://api.github.com/repos/${REPO}/releases/latest" |
+		wget --no-check-certificate --timeout=10 -qO- "https://api.github.com/repos/${REPO}/releases/latest" |
 			grep "browser_download_url" |
 			grep "${MATCH}" |
 			sed 's/.*"browser_download_url": "\([^"]*\)".*/\1/' ||
@@ -26,7 +26,10 @@ gh_download() {
 	fi
 	FILENAME=$(basename "$DOWNLOAD_URL")
 	ui_print "- Downloading $FILENAME..."
-	wget --no-check-certificate -qO "$TMPDIR/$FILENAME" "$DOWNLOAD_URL"
+	wget --no-check-certificate --timeout=100 -qO "$TMPDIR/$FILENAME" "$DOWNLOAD_URL" || {
+		ui_print "! Download timeout or failed"
+		return 1
+	}
 }
 
 # shellcheck disable=SC2034
@@ -100,6 +103,8 @@ unzip -qqjo "$ZIPFILE" 'tailscale/scripts/*' -d "$TS_SCRIPTS_DIR"
 unzip -qqjo "$ZIPFILE" 'tailscale/settings.sh' -d "$TS_DIR"
 ln -sf "$TS_BIN_DIR/tailscaled" "$TS_BIN_DIR/tailscale"
 ln -sf "$TS_BIN_DIR/"* "$MODPATH/system/bin/"
+
+ln -sf "$TS_SCRIPTS_DIR/tailscaled.service" "$MODPATH/system/bin/"
 
 ui_print "- Setting permissions"
 set_perm_recursive "$TS_BIN_DIR/" 0 0 0755 0755 "u:object_r:system_file:s0"
@@ -176,4 +181,4 @@ else
 		ui_print "  su -c 'tailscaled.service'"
 	fi
 fi
-[ -n "$DEBUG" ] && { set +ue; } || true
+[ -n "${DEBUG:-}" ] && { set +ue; } || true
