@@ -29,3 +29,9 @@ jq --arg v "$NEW_VERSION" --arg vc "$NEW_VERSION_CODE" \
   update.json > update.json.tmp && mv update.json.tmp update.json
 
 echo "Bumped $BUMP_TYPE: v$CURRENT → $NEW_VERSION (code: $NEW_VERSION_CODE)"
+echo ""
+echo "Next steps:"
+echo "  git add module.prop update.json"
+echo "  git commit -m 'Bump version to $NEW_VERSION'"
+echo "  git tag $NEW_VERSION"
+echo "  git push && git push --tags"
