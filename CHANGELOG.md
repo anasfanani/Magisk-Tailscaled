@@ -1,3 +1,8 @@
+## v2.0.0.1
+
+- 429e1b0 build: fix version bump and add pre-release for build version
+- 75834b4 fix: path order
+
 ## v2.0.0.0
 
 ### ⚠️ Important Notice
