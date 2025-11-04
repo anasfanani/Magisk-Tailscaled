@@ -11,7 +11,7 @@ export TS_MOD_PROP="${TS_MOD_DIR}/module.prop"
 TS_DIR="/data/adb/tailscale"
 
 # Set path environment for busybox & other.
-export PATH="/data/adb/magisk:/data/adb/ksu/bin:$PATH:/system/bin:${TS_MOD_DIR}/system/bin:${TS_DIR}/bin:${TS_DIR}/scripts"
+export PATH="${TS_DIR}/bin:${TS_DIR}/scripts:/data/adb/magisk:/data/adb/ksu/bin:$PATH:/system/bin:${TS_MOD_DIR}/system/bin"
 export HOME="/data/adb/tailscale/" # Because tailscaled will write log to $HOME
 
 # Set tailscaled & tailscale configuration
