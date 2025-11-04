@@ -26,7 +26,7 @@ gh_download() {
 	fi
 	FILENAME=$(basename "$DOWNLOAD_URL")
 	ui_print "- Downloading $FILENAME..."
-	wget --no-check-certificate --timeout=100 -qO "$TMPDIR/$FILENAME" "$DOWNLOAD_URL" || {
+	wget --no-check-certificate --timeout=100 -O "$TMPDIR/$FILENAME" "$DOWNLOAD_URL" || {
 		ui_print "! Download timeout or failed"
 		return 1
 	}
